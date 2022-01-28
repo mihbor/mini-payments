@@ -1,0 +1,38 @@
+
+plugins {
+  kotlin("multiplatform") version "1.6.10"
+  kotlin("plugin.serialization") version "1.6.10"
+  id("org.jetbrains.compose") version "1.0.1"
+}
+
+repositories {
+  mavenCentral()
+  maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+  google()
+}
+
+// Enable JS(IR) target and add dependencies
+kotlin {
+  js(IR) {
+    browser()
+    binaries.executable()
+  }
+  sourceSets {
+    val jsMain by getting {
+      dependencies {
+        implementation(compose.web.core)
+        implementation(compose.runtime)
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.1")
+        implementation("com.ionspin.kotlin:bignum:0.3.3")
+        implementation("com.ionspin.kotlin:bignum-serialization-kotlinx:0.3.3")
+      }
+    }
+  }
+}
+
+afterEvaluate {
+  rootProject.extensions.configure<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension> {
+    versions.webpackDevServer.version = "4.0.0"
+    versions.webpackCli.version = "4.9.0"
+  }
+}

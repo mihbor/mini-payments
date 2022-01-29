@@ -29,3 +29,12 @@ kotlin {
     }
   }
 }
+
+tasks.register<Zip>("minidappDistribution") {
+  dependsOn("jsBrowserDistribution")
+  archiveFileName.set("miniPayments.minidapp")
+  destinationDirectory.set(layout.buildDirectory.dir("minidapp"))
+  from(layout.buildDirectory.dir("distributions")) {
+    exclude("*.map")
+  }
+}

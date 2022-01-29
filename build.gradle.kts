@@ -11,7 +11,6 @@ repositories {
   google()
 }
 
-// Enable JS(IR) target and add dependencies
 kotlin {
   js(IR) {
     browser()
@@ -25,14 +24,8 @@ kotlin {
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.1")
         implementation("com.ionspin.kotlin:bignum:0.3.3")
         implementation("com.ionspin.kotlin:bignum-serialization-kotlinx:0.3.3")
+        implementation(npm("qrcode", "1.5.0"))
       }
     }
-  }
-}
-
-afterEvaluate {
-  rootProject.extensions.configure<org.jetbrains.kotlin.gradle.targets.js.nodejs.NodeJsRootExtension> {
-    versions.webpackDevServer.version = "4.0.0"
-    versions.webpackCli.version = "4.9.0"
   }
 }

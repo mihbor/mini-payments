@@ -1,0 +1,38 @@
+image: gradle
+
+variables:
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+before_script:
+  - export GRADLE_USER_HOME=`pwd`/.gradle
+
+build:
+  stage: build
+  script: gradle --build-cache minidappDistribution
+  artifacts:
+    paths:
+      - build/minidapp/miniPayments.minidapp
+  cache:
+    key: "$CI_COMMIT_REF_NAME"
+    policy: push
+    paths:
+      - build
+      - .gradle
+
+pages:
+  stage: deploy
+  script:
+    - mkdir .public
+    - cp -r build/minidapp/* .public
+    - cd .public/
+    - echo "<html><body><h1>Directory listing:</h1>" > ./index.html
+    - find -exec echo "<a href='{}'>{}</a><br/>" \; >> ./index.html
+    - echo "</body></html>" >> ./index.html
+    - cd ..
+    - rm -rf public
+    - mv .public public
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH

@@ -25,6 +25,7 @@ kotlin {
         implementation("com.ionspin.kotlin:bignum:0.3.3")
         implementation("com.ionspin.kotlin:bignum-serialization-kotlinx:0.3.3")
         implementation(npm("qrcode", "1.5.0"))
+        implementation(npm("qr-scanner", "1.3.0"))
       }
     }
   }

@@ -1,5 +1,8 @@
+package ui
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import balances
 import org.jetbrains.compose.web.attributes.selected
 import org.jetbrains.compose.web.dom.Option
 import org.jetbrains.compose.web.dom.Select

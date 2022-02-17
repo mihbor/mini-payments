@@ -3,6 +3,8 @@ import kotlinx.coroutines.MainScope
 import kotlinx.serialization.json.Json
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.renderComposableInBody
+import ui.FundChannel
+import ui.JoinChannel
 import ui.Receive
 import ui.Send
 
@@ -19,5 +21,9 @@ fun main() {
     Receive()
     Br()
     Send()
+    Br()
+    FundChannel()
+    Br()
+    JoinChannel()
   }
 }

@@ -27,6 +27,11 @@ suspend fun newAddress(): String {
   return newaddress.response.address.miniaddress
 }
 
+suspend fun newKey(): String {
+  val keys = Minima.cmd("keys new")
+  return keys.response.key.publickey as String
+}
+
 suspend fun post(toAddress: String, amount: Double, tokenId: String) {
   val txnId = newTxId()
   

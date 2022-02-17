@@ -26,7 +26,7 @@ fun Receive() {
   Button({
     onClick {
       showReceive = !showReceive
-      val canvas = document.getElementById("canvas") as HTMLCanvasElement
+      val canvas = document.getElementById("receiveQR") as HTMLCanvasElement
       if(showReceive) scope.launch {
         myAddress = newAddress()
         QRCode.toCanvas(canvas, myAddress, { error ->
@@ -48,7 +48,7 @@ fun Receive() {
   if (showReceive) Text(myAddress)
   Br()
   Canvas({
-    id("canvas")
+    id("receiveQR")
     style {
       if (!showReceive) display(DisplayStyle.None)
     }

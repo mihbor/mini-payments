@@ -23,7 +23,7 @@ fun Send() {
   Button({
     onClick {
       showSend = !showSend
-      val video = document.getElementById("video").also { console.log("video", it) } as HTMLVideoElement
+      val video = document.getElementById("sendVideo").also { console.log("video", it) } as HTMLVideoElement
       if (showSend) {
         qrScanner = QrScanner(video) { result ->
           console.log("decoded qr code: $result")
@@ -33,10 +33,6 @@ fun Send() {
       } else {
         console.log("qrScanner", qrScanner)
         qrScanner?.stop()
-//          qrScanner?.destroy()
-//          video.pause()
-//          video.removeAttribute("src")
-//          video.load()
       }
     }
     style {
@@ -78,7 +74,7 @@ fun Send() {
   }
   Br()
   Video({
-    id("video")
+    id("sendVideo")
     style {
       if (!showSend) display(DisplayStyle.None)
       width(500.px)

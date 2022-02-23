@@ -15,8 +15,10 @@ val firebaseApp = Firebase.initialize(options= FirebaseOptions(
 
 const val COLLECTION = "transactions"
 
-suspend fun fetch(id: String): String? =
-  (Firebase.firestore.collection(COLLECTION).document(id).get().data() as Map<String, String>)["tx"]
+suspend fun fetch(id: String): String? = (
+  Firebase.firestore.collection(COLLECTION).document(id).get()
+    .takeIf { it.exists }?.data() as Map<String, String>?
+  )?.let{ it["tx"] }
 
 suspend fun store(id: String, content: String) {
   Firebase.firestore.collection(COLLECTION).document(id).set(mapOf("tx" to content))

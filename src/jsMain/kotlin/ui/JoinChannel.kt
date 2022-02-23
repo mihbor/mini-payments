@@ -2,6 +2,8 @@ package ui
 
 import androidx.compose.runtime.*
 import externals.QrScanner
+import fetch
+import importTx
 import kotlinx.browser.document
 import kotlinx.coroutines.launch
 import newKey
@@ -36,6 +38,11 @@ fun JoinChannel() {
             otherSettleKey = this[1]
           }
           qrScanner!!.stop()
+          scope.launch {
+            val tx = fetch("$otherUpdateKey;$otherSettleKey")
+            console.log("tx", tx)
+            tx?.let{importTx(it)}
+          }
         }.also { it.start() }
         myUpdateKey = newKey()
         mySettleKey = newKey()

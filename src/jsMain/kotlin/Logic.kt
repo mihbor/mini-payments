@@ -63,3 +63,13 @@ suspend fun exportTx(toAddress: String, amount: Double, tokenId: String): String
   console.log("export", txnexport.response.transaction)
   return txnexport.response.transaction as String
 }
+
+suspend fun importTx(tx: String) {
+  val txnId = newTxId()
+  
+  val txncreator = "txncreate $txnId;" +
+    "txnimport $txnId $tx"
+  val result = Minima.cmd(txncreator) as Array<dynamic>
+  val txnimport = result.find{(it.minifunc as String).startsWith("txnimport $txnId")}
+  console.log("import", txnimport.message)
+}

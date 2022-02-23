@@ -9,6 +9,7 @@ repositories {
   mavenCentral()
   maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
   google()
+  flatDir(mapOf("dir" to "libs"))
 }
 
 kotlin {
@@ -22,8 +23,13 @@ kotlin {
         implementation(compose.web.core)
         implementation(compose.runtime)
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.1")
+        
         implementation("com.ionspin.kotlin:bignum:0.3.3")
         implementation("com.ionspin.kotlin:bignum-serialization-kotlinx:0.3.3")
+  
+        implementation(fileTree(mapOf("dir" to "libs", "include" to listOf("*.jar", "*.klib"))))
+
+        
         implementation(npm("qrcode", "1.5.0"))
         implementation(npm("qr-scanner", "1.3.0"))
       }

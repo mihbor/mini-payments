@@ -14,6 +14,7 @@ import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLVideoElement
 import scope
 import script
+import store
 
 @Composable
 fun FundChannel() {
@@ -94,6 +95,7 @@ fun FundChannel() {
           scope.launch {
             val address = deployScript(script(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
             val tx = exportTx(address, amount, tokenId)
+            store("$myUpdateKey;$mySettleKey", tx)
           }
         }
       }) {

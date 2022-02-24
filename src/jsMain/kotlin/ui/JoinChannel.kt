@@ -1,10 +1,11 @@
 package ui
 
 import androidx.compose.runtime.*
-import externals.QrScanner
-import fetch
 import importTx
 import kotlinx.browser.document
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import newKey
 import org.jetbrains.compose.web.css.*
@@ -13,8 +14,8 @@ import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Text
 import org.jetbrains.compose.web.dom.Video
 import org.w3c.dom.HTMLCanvasElement
-import org.w3c.dom.HTMLVideoElement
 import scope
+import subscribe
 
 @Composable
 fun JoinChannel() {
@@ -23,32 +24,25 @@ fun JoinChannel() {
   var mySettleKey by remember { mutableStateOf("") }
   var otherUpdateKey by remember { mutableStateOf("") }
   var otherSettleKey by remember { mutableStateOf("") }
-  var qrScanner: QrScanner? by remember { mutableStateOf(null) }
   
   Button({
     onClick {
       showJoinChannel = !showJoinChannel
       val canvas = document.getElementById("joinChannelQR") as HTMLCanvasElement
-      val video = document.getElementById("joinChannelVideo").also { console.log("video", it) } as HTMLVideoElement
       if(showJoinChannel) scope.launch {
-        qrScanner = QrScanner(video) { result ->
-          console.log("decoded qr code: $result")
-          result.split(';').apply {
-            otherUpdateKey = this[0]
-            otherSettleKey = this[1]
-          }
-          qrScanner!!.stop()
-          scope.launch {
-            val tx = fetch("$otherUpdateKey;$otherSettleKey")
-            console.log("tx", tx)
-            tx?.let{importTx(it)}
-          }
-        }.also { it.start() }
         myUpdateKey = newKey()
         mySettleKey = newKey()
         QRCode.toCanvas(canvas, "$myUpdateKey;$mySettleKey", { error ->
           if (error != null) console.error(error)
-          else console.log("qr generated")
+          else {
+            console.log("qr generated")
+            subscribe("$myUpdateKey;$mySettleKey").onEach { tx ->
+              console.log("tx", tx)
+              importTx(tx)
+            }.onCompletion {
+              console.log("completed")
+            }.launchIn(scope)
+          }
         })
       }
     }
@@ -73,7 +67,7 @@ fun JoinChannel() {
   })
   if(showJoinChannel) {
     Br()
-    Text("Scan counter party keys QR code")
+    Text("Scan QR code on counter party device")
   }
   Br()
   Video({

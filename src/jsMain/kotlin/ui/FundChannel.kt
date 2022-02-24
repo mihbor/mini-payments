@@ -10,7 +10,6 @@ import newKey
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
-import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLVideoElement
 import scope
 import script
@@ -32,7 +31,6 @@ fun FundChannel() {
   Button({
     onClick {
       showFundChannel = !showFundChannel
-      val canvas = document.getElementById("fundChannelQR") as HTMLCanvasElement
       val video = document.getElementById("fundChannelVideo").also { console.log("video", it) } as HTMLVideoElement
       if (showFundChannel) scope.launch {
         showFundScanner = true
@@ -48,10 +46,7 @@ fun FundChannel() {
         
         myUpdateKey = newKey()
         mySettleKey = newKey()
-        QRCode.toCanvas(canvas, "$myUpdateKey;$mySettleKey", { error ->
-          if (error != null) console.error(error)
-          else console.log("qr generated")
-        })
+
       }
       else {
         console.log("qrScanner", qrScanner)
@@ -95,24 +90,13 @@ fun FundChannel() {
           scope.launch {
             val address = deployScript(script(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
             val tx = exportTx(address, amount, tokenId)
-            store("$myUpdateKey;$mySettleKey", tx)
+            store("$otherUpdateKey;$otherSettleKey", tx)
           }
         }
       }) {
         Text("Export funding transaction")
       }
     }
-  }
-  Br()
-  Canvas({
-    id("fundChannelQR")
-    style {
-      if (!showFundChannel) display(DisplayStyle.None)
-    }
-  })
-  if(showFundScanner) {
-    Br()
-    Text("Scan counter party keys QR code")
   }
   Br()
   Video({

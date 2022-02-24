@@ -2,6 +2,8 @@ import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.FirebaseOptions
 import dev.gitlive.firebase.firestore.firestore
 import dev.gitlive.firebase.initialize
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.mapNotNull
 
 val firebaseApp = Firebase.initialize(options= FirebaseOptions(
   
@@ -19,6 +21,14 @@ suspend fun fetch(id: String): String? = (
   Firebase.firestore.collection(COLLECTION).document(id).get()
     .takeIf { it.exists }?.data() as Map<String, String>?
   )?.let{ it["tx"] }
+
+fun subscribe(id: String): Flow<String> =
+  Firebase.firestore.collection(COLLECTION).document(id).let{
+    console.log("requesting id", id)
+    it.snapshots.mapNotNull { doc ->
+      (doc.takeIf { doc.exists }?.data() as Map<String, String>?)?.let { data -> "${doc.id};${data["tx"]}" }
+    }
+  }
 
 suspend fun store(id: String, content: String) {
   Firebase.firestore.collection(COLLECTION).document(id).set(mapOf("tx" to content))

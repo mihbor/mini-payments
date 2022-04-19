@@ -6,7 +6,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.mapNotNull
 
 val firebaseApp = Firebase.initialize(options= FirebaseOptions(
-  
   apiKey= "AIzaSyAxCuQGZTOrHLS-qdaUN2LdEkwHSy3CDpw",
   authDomain= "mini-payments.firebaseapp.com",
   projectId= "mini-payments",
@@ -23,11 +22,8 @@ suspend fun fetch(id: String): String? = (
   )?.let{ it["tx"] }
 
 fun subscribe(id: String): Flow<String> =
-  Firebase.firestore.collection(COLLECTION).document(id).let{
-    console.log("requesting id", id)
-    it.snapshots.mapNotNull { doc ->
-      (doc.takeIf { doc.exists }?.data() as Map<String, String>?)?.let { data -> "${doc.id};${data["tx"]}" }
-    }
+  Firebase.firestore.collection(COLLECTION).document(id).snapshots.mapNotNull { doc ->
+      ((if(doc.exists) doc else null)?.data() as Map<String, String>?)?.let { data -> "${doc.id};${data["tx"]}" }
   }
 
 suspend fun store(id: String, content: String) {

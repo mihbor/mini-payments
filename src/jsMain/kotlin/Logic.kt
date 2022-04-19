@@ -13,6 +13,7 @@ fun newTxId() = Random.nextInt(1_000_000_000)
 
 fun init() {
   Minima.debug = true
+  Minima.logging = true
   Minima.init { msg ->
     when (msg.event) {
       "connected" -> {

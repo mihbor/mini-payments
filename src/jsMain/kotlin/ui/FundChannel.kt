@@ -1,6 +1,7 @@
 package ui
 
 import androidx.compose.runtime.*
+import com.ionspin.kotlin.bignum.decimal.toBigDecimal
 import deployScript
 import exportTx
 import externals.QrScanner
@@ -89,7 +90,7 @@ fun FundChannel() {
         onClick {
           scope.launch {
             val address = deployScript(script(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
-            val tx = exportTx(address, amount, tokenId)
+            val tx = exportTx(address, amount.toBigDecimal(), tokenId)
             store("$otherUpdateKey;$otherSettleKey", tx)
           }
         }

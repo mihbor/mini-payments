@@ -50,13 +50,13 @@ suspend fun newAddress(): String {
 }
 
 suspend fun newKey(): String {
-  val keys = MDS.cmd("keys new")
-  return keys.response.key.publickey as String
+  val keys = MDS.cmd("keys action:new")
+  return keys.response.publickey as String
 }
 
 suspend fun deployScript(text: String): String {
-  val newscript = MDS.cmd("""newscript "$text"""")
-  return newscript.response.address.hexaddress
+  val newscript = MDS.cmd("""newscript script:"$text" track:true""")
+  return newscript.response.address
 }
 
 suspend fun getCoins(tokenId: String): List<Coin> {
@@ -100,17 +100,22 @@ fun List<Coin>.ofAtLeast(amount: BigDecimal): List<Coin> {
 
 fun <T> Iterable<T>.sumOf(selector: (T) -> BigDecimal) = fold(BigDecimal.ZERO) { acc, item -> acc + selector(item) }
 
-suspend fun exportTx(toAddress: String, amount: Double, tokenId: String): String {
+suspend fun exportTx(toAddress: String, amount: BigDecimal, tokenId: String): String {
   val txnId = newTxId()
+  val inputs = mutableListOf<Coin>()
+  val outputs = mutableListOf<Output>()
+  coverShortage(tokenId, amount, inputs, outputs)
   
   val txncreator = "txncreate id:$txnId;" +
-    "txnauto id:$txnId $amount $toAddress $tokenId;" +
+    inputs.map{ "txninput id:$txnId coinid:${it.coinid};"}.joinToString("") +
+    "txnoutput id:$txnId amount:${amount.toPlainString()} address:$toAddress tokenid:$tokenId;" +
+    outputs.map{ "txnoutput id:$txnId amount:${it.amount.toPlainString()} address:${it.address} tokenid:${it.token};"}.joinToString("") +
     "txnexport id:$txnId;"
   
   val result = MDS.cmd(txncreator) as Array<dynamic>
-  val txnexport = result.find{it.minifunc == "txnexport id:$txnId"}
-  console.log("export", txnexport.response.transaction)
-  return txnexport.response.transaction as String
+  val txnexport = result.find{it.command == "txnexport"}
+  console.log("export", txnexport.response.data)
+  return txnexport.response.data as String
 }
 
 suspend fun importTx(tx: String) {
@@ -119,6 +124,6 @@ suspend fun importTx(tx: String) {
   val txncreator = "txncreate id:$txnId;" +
     "txnimport id:$txnId data:$tx"
   val result = MDS.cmd(txncreator) as Array<dynamic>
-  val txnimport = result.find{(it.minifunc as String).startsWith("txnimport $txnId")}
+  val txnimport = result.find{it.command == "txnimport"}
   console.log("import", txnimport.message)
 }

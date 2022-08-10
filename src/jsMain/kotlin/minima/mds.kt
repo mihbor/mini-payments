@@ -182,7 +182,6 @@ fun PollListener(){
   val polldata = "series=$PollSeries&counter=$PollCounter"
   
   httpPostAsyncPoll(pollhost, polldata) { msg: dynamic ->
-    console.log("msg", msg.series, msg.counter)
     //Are we on the right Series
     if (PollSeries != msg.series) {
     
@@ -201,7 +200,6 @@ fun PollListener(){
         MDSPostMessage(msg.response.message)
       }
     }
-    console.log("stored", PollSeries, PollCounter)
   
     //And around we go again
     PollListener()

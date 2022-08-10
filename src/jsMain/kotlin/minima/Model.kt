@@ -4,36 +4,28 @@ import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
 
-@Serializable
 data class Balance(
   val tokenid: String,
-  val token: String,
-  val total: String,
-  val decimals: String,
-  @Contextual
+  val token: TokenDescriptor?,
+//  val total: String,
   val confirmed: BigDecimal,
-  @Contextual
   val unconfirmed: BigDecimal,
-  val mempool: String,
-  @Contextual
   val sendable: BigDecimal
 )
 
 @Serializable
-data class CoinSimple(
-  val key: String,
-  @Contextual
-  val tokenamount: BigDecimal,
-  val coin: Coin
+data class TokenDescriptor(
+  val name: String,
+  val description: String?,
+  val url: String?
 )
 
 @Serializable
 data class Coin(
   val address: String,
-  val amount: String,
+  @Contextual
+  val amount: BigDecimal,
   val coinid: String,
-  val floating: Boolean,
-  val mxaddress: String,
   val storestate: Boolean,
   val tokenid: String
 )

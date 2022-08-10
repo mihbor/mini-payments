@@ -1,6 +1,7 @@
 package ui
 
 import androidx.compose.runtime.*
+import com.ionspin.kotlin.bignum.decimal.toBigDecimal
 import externals.QrScanner
 import kotlinx.browser.document
 import kotlinx.coroutines.launch
@@ -64,8 +65,9 @@ fun Send() {
       onClick {
         console.log("post $amount [$tokenId] to $toAddress")
         showSend = false
+        qrScanner?.stop()
         scope.launch {
-          post(toAddress, amount, tokenId)
+          post(toAddress, amount.toBigDecimal(), tokenId)
         }
       }
     }) {

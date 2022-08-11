@@ -10,7 +10,8 @@ data class Balance(
 //  val total: String,
   val confirmed: BigDecimal,
   val unconfirmed: BigDecimal,
-  val sendable: BigDecimal
+  val sendable: BigDecimal,
+  val coins: Int
 )
 
 @Serializable
@@ -25,6 +26,8 @@ data class Coin(
   val address: String,
   @Contextual
   val amount: BigDecimal,
+  @Contextual
+  val tokenamount: BigDecimal,
   val coinid: String,
   val storestate: Boolean,
   val tokenid: String

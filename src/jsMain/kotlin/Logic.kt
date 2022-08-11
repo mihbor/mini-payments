@@ -34,13 +34,19 @@ suspend fun getBalances(): List<Balance> {
   val balance = MDS.cmd("balance")
   val balances = balance.response as Array<dynamic>
   return balances.map {
-    Balance(
-      token = if (it.token == "Minima") null else json.decodeFromDynamic<TokenDescriptor>(it.token),
-      tokenid = it.tokenid,
-      confirmed = json.decodeFromDynamic(it.confirmed),
-      unconfirmed = json.decodeFromDynamic(it.confirmed),
-      sendable = json.decodeFromDynamic(it.confirmed),
-    )
+    try {
+      Balance(
+        token = if (it.token == "Minima") null else json.decodeFromDynamic<TokenDescriptor>(it.token),
+        tokenid = it.tokenid,
+        confirmed = json.decodeFromDynamic(it.confirmed),
+        unconfirmed = json.decodeFromDynamic(it.unconfirmed),
+        sendable = json.decodeFromDynamic(it.sendable),
+        coins = (it.coins as String).toInt()
+      )
+    } catch (e: Exception) {
+      console.log("Exception mapping balance", it, e)
+      throw e
+    }
   }
 }
 
@@ -88,14 +94,14 @@ suspend fun coverShortage(tokenId: String, shortage: BigDecimal, inputs: Mutable
   
   val coins = getCoins(tokenId).ofAtLeast(shortage)
   coins.forEach { inputs.add(it) }
-  val change = coins.sumOf { it.amount } - shortage
+  val change = coins.sumOf { it.tokenamount } - shortage
   if (change > BigDecimal.ZERO) outputs.add(Output(newAddress(), change, tokenId))
 }
 
 fun List<Coin>.ofAtLeast(amount: BigDecimal): List<Coin> {
-  return firstOrNull { it.amount >= amount }
+  return firstOrNull { it.tokenamount >= amount }
     ?.let{ listOf(it) }
-    ?: (listOf(last()) + take(size-1).ofAtLeast(amount - last().amount))
+    ?: (listOf(last()) + take(size-1).ofAtLeast(amount - last().tokenamount))
 }
 
 fun <T> Iterable<T>.sumOf(selector: (T) -> BigDecimal) = fold(BigDecimal.ZERO) { acc, item -> acc + selector(item) }

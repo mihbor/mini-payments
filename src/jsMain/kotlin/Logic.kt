@@ -124,12 +124,12 @@ suspend fun exportTx(toAddress: String, amount: BigDecimal, tokenId: String): St
   return txnexport.response.data as String
 }
 
-suspend fun importTx(tx: String) {
+suspend fun importTx(data: String) {
   val txnId = newTxId()
   
   val txncreator = "txncreate id:$txnId;" +
-    "txnimport id:$txnId data:$tx"
+    "txnimport id:$txnId data:$data"
   val result = MDS.cmd(txncreator) as Array<dynamic>
   val txnimport = result.find{it.command == "txnimport"}
-  console.log("import", txnimport.message)
+  console.log("import", txnimport.status)
 }

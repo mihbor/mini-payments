@@ -27,7 +27,7 @@ data class Coin(
   @Contextual
   val amount: BigDecimal,
   @Contextual
-  val tokenamount: BigDecimal,
+  val tokenamount: BigDecimal? = amount,
   val coinid: String,
   val storestate: Boolean,
   val tokenid: String

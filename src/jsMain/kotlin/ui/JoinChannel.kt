@@ -1,13 +1,17 @@
 package ui
 
 import androidx.compose.runtime.*
+import deployScript
+import exportSettlement
 import importTx
 import kotlinx.browser.document
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import multisigScript
 import newKey
+import newTxId
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Button
@@ -15,6 +19,7 @@ import org.jetbrains.compose.web.dom.Text
 import org.jetbrains.compose.web.dom.Video
 import org.w3c.dom.HTMLCanvasElement
 import scope
+import store
 import subscribe
 
 @Composable
@@ -22,8 +27,6 @@ fun JoinChannel() {
   var showJoinChannel by remember { mutableStateOf(false) }
   var myUpdateKey by remember { mutableStateOf("") }
   var mySettleKey by remember { mutableStateOf("") }
-  var otherUpdateKey by remember { mutableStateOf("") }
-  var otherSettleKey by remember { mutableStateOf("") }
   
   Button({
     onClick {
@@ -36,9 +39,15 @@ fun JoinChannel() {
           if (error != null) console.error(error)
           else {
             console.log("qr generated")
-            subscribe("$myUpdateKey;$mySettleKey").onEach { tx ->
-              console.log("tx", tx)
-              importTx(tx)
+            subscribe("$myUpdateKey;$mySettleKey").onEach { msg ->
+              console.log("funding tx msg", msg)
+              val (timeLock, otherUpdateKey, otherSettleKey, otherAddress, fundingTx) = msg.split(";")
+              val importedTx = importTx(newTxId(), fundingTx)
+              val multisigScriptAddress = deployScript(multisigScript(timeLock.toInt(), otherUpdateKey, myUpdateKey, otherSettleKey, mySettleKey))
+              console.log("multisig address (join)", multisigScriptAddress)
+              val initialSettlementTx = exportSettlement(mySettleKey, multisigScriptAddress, otherAddress, importedTx)
+              console.log("publishing to", "$otherUpdateKey;$otherSettleKey", "tx size", initialSettlementTx.length)
+              store("$otherUpdateKey;$otherSettleKey", initialSettlementTx)
             }.onCompletion {
               console.log("completed")
             }.launchIn(scope)

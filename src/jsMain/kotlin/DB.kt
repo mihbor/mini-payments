@@ -23,7 +23,9 @@ suspend fun fetch(id: String): String? = (
 
 fun subscribe(id: String): Flow<String> =
   Firebase.firestore.collection(COLLECTION).document(id).snapshots.mapNotNull { doc ->
-      ((if(doc.exists) doc else null)?.data() as Map<String, String>?)?.let { data -> data["tx"] }
+      ((if(doc.exists) doc else null)?.data() as Map<String, String>?)
+        ?.let { data -> data["tx"] }
+        ?: console.log("doc doesn't exist", id); ""
   }
 
 suspend fun store(id: String, content: String) {

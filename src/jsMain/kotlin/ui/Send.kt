@@ -16,6 +16,7 @@ import scope
 fun Send() {
   
   var showSend by remember { mutableStateOf(false) }
+  var showCam by remember { mutableStateOf(false) }
   var toAddress by remember { mutableStateOf("") }
   var amount by remember { mutableStateOf(0.0) }
   var tokenId by remember { mutableStateOf("0x00") }
@@ -24,12 +25,17 @@ fun Send() {
   Button({
     onClick {
       showSend = !showSend
+      showCam = showSend
       val video = document.getElementById("sendVideo").also { console.log("video", it) } as HTMLVideoElement
       if (showSend) {
         qrScanner = QrScanner(video) { result ->
           console.log("decoded qr code: $result")
-          toAddress = result
+          val splits = result.split(";")
+          toAddress = splits[0]
+          if (splits.size > 1 && splits[1].isNotEmpty()) tokenId = splits[1]
+          if (splits.size > 2 && splits[2].isNotEmpty()) amount = splits[2].toDouble()
           qrScanner!!.stop()
+          showCam = false
         }.also { it.start() }
       } else {
         console.log("qrScanner", qrScanner)
@@ -78,7 +84,7 @@ fun Send() {
   Video({
     id("sendVideo")
     style {
-      if (!showSend) display(DisplayStyle.None)
+      if (!showCam) display(DisplayStyle.None)
       width(500.px)
       height(500.px)
     }

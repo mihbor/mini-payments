@@ -5,16 +5,24 @@ import com.ionspin.kotlin.bignum.decimal.toBigDecimal
 import deployScript
 import exportTx
 import externals.QrScanner
+import importTx
 import kotlinx.browser.document
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import multisigScript
+import newAddress
 import newKey
+import newTxId
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLVideoElement
 import scope
-import script
+import signAndPost
 import store
+import subscribe
 
 @Composable
 fun FundChannel() {
@@ -89,9 +97,20 @@ fun FundChannel() {
         if(amount <= 0) disabled()
         onClick {
           scope.launch {
-            val address = deployScript(script(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
-            val tx = exportTx(address, amount.toBigDecimal(), tokenId)
-            store("$otherUpdateKey;$otherSettleKey", tx)
+            val multisigScriptAddress = deployScript(multisigScript(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
+            console.log("multisig address (fund)", multisigScriptAddress)
+            val fundingTx = exportTx(multisigScriptAddress, amount.toBigDecimal(), tokenId)
+            store("$otherUpdateKey;$otherSettleKey", listOf(timeLock, myUpdateKey, mySettleKey, newAddress(), fundingTx).joinToString(";"))
+  
+            console.log("subscribing to", "$myUpdateKey;$mySettleKey")
+            subscribe("$myUpdateKey;$mySettleKey").onEach { msg ->
+              console.log("settlement tx msg", msg)
+              val id = newTxId()
+              importTx(id, msg)
+              signAndPost(id, mySettleKey)
+            }.onCompletion {
+              console.log("completed")
+            }.launchIn(scope)
           }
         }
       }) {

@@ -19,33 +19,49 @@ import scope
 
 val QRCode = require("qrcode")
 
+fun drawQR(address: String, tokenId:String) {
+  val canvas = document.getElementById("receiveQR") as HTMLCanvasElement
+  QRCode.toCanvas(canvas, "$address;$tokenId", { error ->
+    if (error != null) console.error(error)
+    else console.log("qr generated")
+  })
+}
+
+fun clearQR() {
+  val canvas = document.getElementById("receiveQR") as HTMLCanvasElement
+  (canvas.getContext("2d") as CanvasRenderingContext2D).clearRect(0.0, 0.0, canvas.width.toDouble(), canvas.height.toDouble())
+}
+
 @Composable
 fun Receive() {
   var showReceive by remember { mutableStateOf(false) }
   var myAddress by remember { mutableStateOf("") }
+  var tokenId by remember { mutableStateOf("") }
   Button({
     onClick {
       showReceive = !showReceive
-      val canvas = document.getElementById("receiveQR") as HTMLCanvasElement
       if (showReceive) scope.launch {
         myAddress = newAddress()
-        QRCode.toCanvas(canvas, myAddress, { error ->
-          if (error != null) console.error(error)
-          else console.log("qr generated")
-        })
+        drawQR(myAddress, tokenId)
       } else {
         myAddress = ""
-        (canvas.getContext("2d") as CanvasRenderingContext2D).clearRect(0.0, 0.0, canvas.width.toDouble(), canvas.height.toDouble())
+        clearQR()
       }
     }
     style {
       if (showReceive) border(style = LineStyle.Inset)
     }
   }) {
-    Text("Receive")
+    Text("Request")
   }
   Br()
-  if (showReceive) Text(myAddress)
+  if (showReceive) {
+    Text(myAddress)
+    TokenSelect(tokenId) {
+      tokenId = it
+      drawQR(myAddress, tokenId)
+    }
+  }
   Br()
   Canvas({
     id("receiveQR")

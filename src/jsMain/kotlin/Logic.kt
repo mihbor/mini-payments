@@ -6,8 +6,8 @@ import kotlinx.serialization.json.decodeFromDynamic
 import minima.*
 import kotlin.random.Random
 
-fun multisigScript(blockDiff: Int, updateSig1: String, updateSig2: String, settleSig1: String, settleSig2: String) =
-  "RETURN MULTISGI(2 $updateSig1 $updateSig2) OR ( @BLKDIFF GTE $blockDiff AND MULTISIG(2 $settleSig1 $settleSig2) )"
+fun triggerScript(triggerSig1: String, triggerSig2: String) =
+  "RETURN MULTISGI(2 $triggerSig1 $triggerSig2)"
 
 fun eltooScript(blockDiff: Int = 256, updateSig1: String, updateSig2: String, settleSig1: String, settleSig2: String) = """
 LET st=STATE(99)
@@ -116,7 +116,7 @@ fun List<Coin>.ofAtLeast(amount: BigDecimal): List<Coin> {
 
 fun <T> Iterable<T>.sumOf(selector: (T) -> BigDecimal) = fold(BigDecimal.ZERO) { acc, item -> acc + selector(item) }
 
-suspend fun exportTx(toAddress: String, amount: BigDecimal, tokenId: String): String {
+suspend fun fundingTx(toAddress: String, amount: BigDecimal, tokenId: String): Pair<Int, dynamic> {
   val txnId = newTxId()
   val inputs = mutableListOf<Coin>()
   val outputs = mutableListOf<Output>()
@@ -125,13 +125,33 @@ suspend fun exportTx(toAddress: String, amount: BigDecimal, tokenId: String): St
   val txncreator = "txncreate id:$txnId;" +
     inputs.map{ "txninput id:$txnId coinid:${it.coinid};"}.joinToString("") +
     "txnoutput id:$txnId amount:${amount.toPlainString()} address:$toAddress tokenid:$tokenId;" +
-    outputs.map{ "txnoutput id:$txnId amount:${it.amount.toPlainString()} address:${it.address} tokenid:${it.token};"}.joinToString("") +
-    "txnexport id:$txnId;"
+    outputs.map{ "txnoutput id:$txnId amount:${it.amount.toPlainString()} address:${it.address} tokenid:${it.token};"}.joinToString("")
   
   val result = MDS.cmd(txncreator) as Array<dynamic>
-  val txnexport = result.find{it.command == "txnexport"}
-  console.log("export", txnexport.response.data)
-  return txnexport.response.data as String
+  val txn = result.last()
+  console.log("funding tx", txn.response)
+  return txnId to txn.response
+}
+
+suspend fun signTx(txnId: Int, key: String): dynamic {
+  val txncreator = "txnsign id:$txnId publickey:$key;"
+  val result = MDS.cmd(txncreator)
+  console.log("import", result.status)
+  return result
+}
+
+suspend fun exportTx(txnId: Int): String {
+  val txncreator = "txnexport id:$txnId;"
+  val result = MDS.cmd(txncreator)
+  console.log("export", result.response.data)
+  return result.response.data as String
+}
+
+suspend fun importSignExportTx(data: String, key: String): String {
+  val id = newTxId()
+  importTx(id, data)
+  signTx(id, key)
+  return exportTx(id)
 }
 
 suspend fun importTx(txnId: Int, data: String): dynamic {
@@ -145,6 +165,7 @@ suspend fun importTx(txnId: Int, data: String): dynamic {
 
 suspend fun signAndPost(txnId: Int, key: String): Boolean {
   val txncreator = "txnsign id:$txnId publickey:$key;" +
+    "txnbasics id:$txnId;" +
     "txnpost id:$txnId;" +
     "txndelete id:$txnId;"
   val result = MDS.cmd(txncreator) as Array<dynamic>
@@ -154,21 +175,20 @@ suspend fun signAndPost(txnId: Int, key: String): Boolean {
   
 }
 
-suspend fun exportSettlement(mySettleKey: String, multisigScriptAddress: String, otherAddress: String, importedTx: dynamic): String {
-  console.log("outputs", importedTx.response.transaction.outputs)
-  val outputIndex = (importedTx.response.transaction.outputs as Array<dynamic>).indexOfFirst { it.address == multisigScriptAddress }
-  val output = (importedTx.response.transaction.outputs as Array<dynamic>)[outputIndex]
-  val coindata = (importedTx.response.outputcoindata as Array<dynamic>)[outputIndex]
+suspend fun signFloatingTx(myKey: String, sourceScriptAddress: String, targetAddress: String, tx: dynamic): Pair<Int, dynamic> {
+  console.log("outputs", tx.transaction.outputs)
+  val outputIndex = (tx.transaction.outputs as Array<dynamic>).indexOfFirst { it.address == sourceScriptAddress }
+  val output = (tx.transaction.outputs as Array<dynamic>)[outputIndex]
+  val coindata = (tx.outputcoindata as Array<dynamic>)[outputIndex]
   
   val txnId = newTxId()
   val txncreator = "txncreate id:$txnId;" +
     "txninput id:$txnId coindata:$coindata floating:true;" +
-    "txnoutput id:$txnId amount:${output.amount} address:$otherAddress;" +
-    "txnsign id:$txnId publickey:$mySettleKey;" +
-    "txnexport id:$txnId;"
+    "txnoutput id:$txnId amount:${output.amount} address:$targetAddress;" +
+    "txnsign id:$txnId publickey:$myKey;"
   
   val result = MDS.cmd(txncreator) as Array<dynamic>
-  val txnexport = result.find{it.command == "txnexport"}
-  console.log("export", txnexport.response.data)
-  return txnexport.response.data as String
+  val txnoutput = result.find{it.command == "txnoutput"}
+  return txnId to txnoutput.response
 }
+

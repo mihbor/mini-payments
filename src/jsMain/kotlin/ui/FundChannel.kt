@@ -3,15 +3,16 @@ package ui
 import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.toBigDecimal
 import deployScript
+import eltooScript
 import exportTx
 import externals.QrScanner
+import fundingTx
 import importTx
 import kotlinx.browser.document
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import multisigScript
 import newAddress
 import newKey
 import newTxId
@@ -21,8 +22,10 @@ import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLVideoElement
 import scope
 import signAndPost
+import signFloatingTx
 import store
 import subscribe
+import triggerScript
 
 @Composable
 fun FundChannel() {
@@ -31,8 +34,10 @@ fun FundChannel() {
   var amount by remember { mutableStateOf(0.0) }
   var tokenId by remember { mutableStateOf("0x00") }
   var timeLock by remember { mutableStateOf(10) }
+  var myTriggerKey by remember { mutableStateOf("") }
   var myUpdateKey by remember { mutableStateOf("") }
   var mySettleKey by remember { mutableStateOf("") }
+  var otherTriggerKey by remember { mutableStateOf("") }
   var otherUpdateKey by remember { mutableStateOf("") }
   var otherSettleKey by remember { mutableStateOf("") }
   var qrScanner: QrScanner? by remember { mutableStateOf(null) }
@@ -46,13 +51,15 @@ fun FundChannel() {
         qrScanner = QrScanner(video) { result ->
           console.log("decoded qr code: $result")
           result.split(';').apply {
-            otherUpdateKey = this[0]
-            otherSettleKey = this[1]
+            otherTriggerKey = this[0]
+            otherUpdateKey = this[1]
+            otherSettleKey = this[2]
           }
           qrScanner!!.stop()
           showFundScanner = false
         }.also { it.start() }
         
+        myTriggerKey = newKey()
         myUpdateKey = newKey()
         mySettleKey = newKey()
 
@@ -70,15 +77,19 @@ fun FundChannel() {
   }
   if (showFundChannel) {
     Br()
+    Text("My trigger key: $myTriggerKey")
+    Br()
     Text("My update key: $myUpdateKey")
     Br()
     Text("My settlement key: $mySettleKey")
+    Br()
+    Text("Counterparty trigger key: $otherTriggerKey")
     Br()
     Text("Counterparty update key: $otherUpdateKey")
     Br()
     Text("Counterparty settlement key: $otherSettleKey")
     Br()
-    if (mySettleKey.isNotEmpty() && myUpdateKey.isNotEmpty() && otherSettleKey.isNotEmpty() && otherUpdateKey.isNotEmpty()) {
+    if (listOf(myTriggerKey, mySettleKey, myUpdateKey, otherTriggerKey, otherSettleKey, otherUpdateKey).all(String::isNotEmpty)) {
       NumberInput(amount, min = 0) {
         onInput {
           amount = it.value!!.toDouble()
@@ -97,17 +108,27 @@ fun FundChannel() {
         if(amount <= 0) disabled()
         onClick {
           scope.launch {
-            val multisigScriptAddress = deployScript(multisigScript(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
+            val multisigScriptAddress = deployScript(triggerScript(myTriggerKey, otherTriggerKey))
+            val eltooScriptAddress = deployScript(eltooScript(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
             console.log("multisig address (fund)", multisigScriptAddress)
-            val fundingTx = exportTx(multisigScriptAddress, amount.toBigDecimal(), tokenId)
-            store("$otherUpdateKey;$otherSettleKey", listOf(timeLock, myUpdateKey, mySettleKey, newAddress(), fundingTx).joinToString(";"))
+            val (fundingTxId, fundingTx) = fundingTx(multisigScriptAddress, amount.toBigDecimal(), tokenId)
+            val myAddress = newAddress()
+            val (triggerTxId, triggerTx) = signFloatingTx(myTriggerKey, multisigScriptAddress, eltooScriptAddress, fundingTx)
+            val (settlementTxId, settlementTx) = signFloatingTx(mySettleKey, eltooScriptAddress, myAddress, triggerTx)
+            val exportedTriggerTx = exportTx(triggerTxId)
+            val exportedSettlementTx = exportTx(settlementTxId)
+            store(
+              "$otherTriggerKey;$otherUpdateKey;$otherSettleKey",
+              listOf(timeLock, myTriggerKey, myUpdateKey, mySettleKey, exportedTriggerTx, exportedSettlementTx).joinToString(";")
+            )
   
-            console.log("subscribing to", "$myUpdateKey;$mySettleKey")
-            subscribe("$myUpdateKey;$mySettleKey").onEach { msg ->
-              console.log("settlement tx msg", msg)
-              val id = newTxId()
-              importTx(id, msg)
-              signAndPost(id, mySettleKey)
+            console.log("subscribing to", "$myTriggerKey;$myUpdateKey;$mySettleKey")
+            subscribe("$myTriggerKey;$myUpdateKey;$mySettleKey").onEach { msg ->
+              console.log("trigger and settlement tx msg", msg)
+              val (triggerTx, settlementTx) = msg.split(";")
+              importTx(newTxId(), triggerTx)
+              importTx(newTxId(), settlementTx)
+              signAndPost(fundingTxId, "auto")
             }.onCompletion {
               console.log("completed")
             }.launchIn(scope)

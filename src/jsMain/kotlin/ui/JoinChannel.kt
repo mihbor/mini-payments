@@ -1,17 +1,13 @@
 package ui
 
 import androidx.compose.runtime.*
-import deployScript
-import exportSettlement
-import importTx
+import importSignExportTx
 import kotlinx.browser.document
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import multisigScript
 import newKey
-import newTxId
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Button
@@ -25,6 +21,7 @@ import subscribe
 @Composable
 fun JoinChannel() {
   var showJoinChannel by remember { mutableStateOf(false) }
+  var myTriggerKey by remember { mutableStateOf("") }
   var myUpdateKey by remember { mutableStateOf("") }
   var mySettleKey by remember { mutableStateOf("") }
   
@@ -33,21 +30,27 @@ fun JoinChannel() {
       showJoinChannel = !showJoinChannel
       val canvas = document.getElementById("joinChannelQR") as HTMLCanvasElement
       if(showJoinChannel) scope.launch {
+        myTriggerKey = newKey()
         myUpdateKey = newKey()
         mySettleKey = newKey()
-        QRCode.toCanvas(canvas, "$myUpdateKey;$mySettleKey", { error ->
+        QRCode.toCanvas(canvas, "$myTriggerKey;$myUpdateKey;$mySettleKey", { error ->
           if (error != null) console.error(error)
           else {
-            console.log("qr generated")
-            subscribe("$myUpdateKey;$mySettleKey").onEach { msg ->
+            console.log("qr generated, subscribing to $myTriggerKey;$myUpdateKey;$mySettleKey")
+            subscribe("$myTriggerKey;$myUpdateKey;$mySettleKey").onEach { msg ->
               console.log("funding tx msg", msg)
-              val (timeLock, otherUpdateKey, otherSettleKey, otherAddress, fundingTx) = msg.split(";")
-              val importedTx = importTx(newTxId(), fundingTx)
-              val multisigScriptAddress = deployScript(multisigScript(timeLock.toInt(), otherUpdateKey, myUpdateKey, otherSettleKey, mySettleKey))
-              console.log("multisig address (join)", multisigScriptAddress)
-              val initialSettlementTx = exportSettlement(mySettleKey, multisigScriptAddress, otherAddress, importedTx)
-              console.log("publishing to", "$otherUpdateKey;$otherSettleKey", "tx size", initialSettlementTx.length)
-              store("$otherUpdateKey;$otherSettleKey", initialSettlementTx)
+              val splits = msg.split(";")
+              val timeLock = splits[0].toInt()
+              val otherTriggerKey = splits[1]
+              val otherUpdateKey = splits[2]
+              val otherSettleKey = splits[3]
+              val triggerTx = splits[4]
+              val settlementTx = splits[5]
+              val signedTriggerTx = importSignExportTx(triggerTx, myTriggerKey)
+              val signedSettlementTx = importSignExportTx(settlementTx, mySettleKey)
+//              val multisigScriptAddress = deployScript(triggerScript(otherTriggerKey, myTriggerKey))
+//              val eltooScriptAddress = deployScript(eltooScript(timeLock, otherUpdateKey, myUpdateKey, otherSettleKey, mySettleKey))
+              store("$otherTriggerKey;$otherUpdateKey;$otherSettleKey", listOf(signedTriggerTx, signedSettlementTx).joinToString(";"))
             }.onCompletion {
               console.log("completed")
             }.launchIn(scope)
@@ -62,6 +65,8 @@ fun JoinChannel() {
     Text("Join payment channel")
   }
   if (showJoinChannel) {
+    Br()
+    Text("Trigger key: $myTriggerKey")
     Br()
     Text("Update key: $myUpdateKey")
     Br()

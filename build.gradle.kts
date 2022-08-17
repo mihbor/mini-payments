@@ -39,7 +39,7 @@ kotlin {
 
 tasks.register<Zip>("minidappDistribution") {
   dependsOn("jsBrowserDistribution")
-  archiveFileName.set("miniPayments.minidapp")
+  archiveFileName.set("${project.name}.mds.zip")
   destinationDirectory.set(layout.buildDirectory.dir("minidapp"))
   from(layout.buildDirectory.dir("distributions"))
 }

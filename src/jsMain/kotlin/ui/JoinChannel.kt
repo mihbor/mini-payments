@@ -1,6 +1,8 @@
 package ui
 
 import androidx.compose.runtime.*
+import deployScript
+import eltooScript
 import importSignExportTx
 import kotlinx.browser.document
 import kotlinx.coroutines.flow.launchIn
@@ -17,6 +19,7 @@ import org.w3c.dom.HTMLCanvasElement
 import scope
 import store
 import subscribe
+import triggerScript
 
 @Composable
 fun JoinChannel() {
@@ -24,6 +27,10 @@ fun JoinChannel() {
   var myTriggerKey by remember { mutableStateOf("") }
   var myUpdateKey by remember { mutableStateOf("") }
   var mySettleKey by remember { mutableStateOf("") }
+  var triggerTxStatus by remember { mutableStateOf("") }
+  var settlementTxStatus by remember { mutableStateOf("") }
+  var triggerTransactionId by remember { mutableStateOf<Int?>(null) }
+  var settlementTransactionId by remember { mutableStateOf<Int?>(null) }
   
   Button({
     onClick {
@@ -33,6 +40,8 @@ fun JoinChannel() {
         myTriggerKey = newKey()
         myUpdateKey = newKey()
         mySettleKey = newKey()
+        triggerTxStatus = ""
+        settlementTxStatus= ""
         QRCode.toCanvas(canvas, "$myTriggerKey;$myUpdateKey;$mySettleKey", { error ->
           if (error != null) console.error(error)
           else {
@@ -46,11 +55,17 @@ fun JoinChannel() {
               val otherSettleKey = splits[3]
               val triggerTx = splits[4]
               val settlementTx = splits[5]
-              val signedTriggerTx = importSignExportTx(triggerTx, myTriggerKey)
-              val signedSettlementTx = importSignExportTx(settlementTx, mySettleKey)
-//              val multisigScriptAddress = deployScript(triggerScript(otherTriggerKey, myTriggerKey))
-//              val eltooScriptAddress = deployScript(eltooScript(timeLock, otherUpdateKey, myUpdateKey, otherSettleKey, mySettleKey))
+              val (signedTriggerTxId, signedTriggerTx) = importSignExportTx(triggerTx, myTriggerKey)
+              triggerTransactionId = signedTriggerTxId
+              triggerTxStatus = "Trigger transaction receved, signed"
+              val (signedSettlementTxId, signedSettlementTx) = importSignExportTx(settlementTx, mySettleKey)
+              settlementTransactionId = signedSettlementTxId
+              settlementTxStatus = "Settlement transaction receved, signed"
+              multisigScriptAddress = deployScript(triggerScript(otherTriggerKey, myTriggerKey))
+              eltooScriptAddress = deployScript(eltooScript(timeLock, otherUpdateKey, myUpdateKey, otherSettleKey, mySettleKey))
               store("$otherTriggerKey;$otherUpdateKey;$otherSettleKey", listOf(signedTriggerTx, signedSettlementTx).joinToString(";"))
+              triggerTxStatus += ", sent back"
+              settlementTxStatus += ", sent back"
             }.onCompletion {
               console.log("completed")
             }.launchIn(scope)
@@ -71,6 +86,18 @@ fun JoinChannel() {
     Text("Update key: $myUpdateKey")
     Br()
     Text("Settlement key: $mySettleKey")
+    Br()
+    triggerTxStatus.takeUnless { it.isEmpty() }?.let{
+      Text(it)
+      Br()
+    }
+    settlementTxStatus.takeUnless { it.isEmpty() }?.let{
+      Text(it)
+      Br()
+    }
+    triggerTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
+      ChannelFundingView(multisigScriptAddress.isNotEmpty(), multisigScriptBalances, eltooScriptBalances, trigger,settle)
+    }}
   }
   Br()
   Canvas({

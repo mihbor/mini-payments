@@ -1,13 +1,18 @@
 import androidx.compose.runtime.mutableStateListOf
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
+import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import kotlinx.coroutines.launch
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.decodeFromDynamic
 import minima.*
+import ui.eltooScriptAddress
+import ui.eltooScriptBalances
+import ui.multisigScriptAddress
+import ui.multisigScriptBalances
 import kotlin.random.Random
 
 fun triggerScript(triggerSig1: String, triggerSig2: String) =
-  "RETURN MULTISGI(2 $triggerSig1 $triggerSig2)"
+  "RETURN MULTISIG(2 $triggerSig1 $triggerSig2)"
 
 fun eltooScript(blockDiff: Int = 256, updateSig1: String, updateSig2: String, settleSig1: String, settleSig2: String) = """
 LET st=STATE(99)
@@ -25,14 +30,28 @@ fun newTxId() = Random.nextInt(1_000_000_000)
 
 fun init() {
 //  Minima.debug = true
-  MDS.logging = true
+//  MDS.logging = true
   MDS.init { msg: dynamic ->
     val event = msg.event
-    when {
-      event == "inited" -> {
+    when(event) {
+      "inited" -> {
         if (MDS.logging) console.log("Connected to Minima.")
         scope.launch {
           balances.addAll(getBalances())
+        }
+      }
+      "NEWBLOCK" -> {
+        if (multisigScriptAddress.isNotEmpty() && multisigScriptBalances.none { it.confirmed > ZERO }) {
+          scope.launch {
+            multisigScriptBalances.clear()
+            multisigScriptBalances.addAll(getBalances(multisigScriptAddress))
+          }
+        }
+        if (eltooScriptAddress.isNotEmpty() && eltooScriptBalances.none { it.confirmed > ZERO }) {
+          scope.launch {
+            eltooScriptBalances.clear()
+            eltooScriptBalances.addAll(getBalances(eltooScriptAddress))
+          }
         }
       }
     }
@@ -40,8 +59,8 @@ fun init() {
 }
 
 @OptIn(ExperimentalSerializationApi::class)
-suspend fun getBalances(): List<Balance> {
-  val balance = MDS.cmd("balance")
+suspend fun getBalances(address: String? = null): List<Balance> {
+  val balance = MDS.cmd(address?.let{"balance address:$address"} ?: "balance")
   val balances = balance.response as Array<dynamic>
   return balances.map {
     try {
@@ -147,11 +166,11 @@ suspend fun exportTx(txnId: Int): String {
   return result.response.data as String
 }
 
-suspend fun importSignExportTx(data: String, key: String): String {
+suspend fun importSignExportTx(data: String, key: String): Pair<Int, String> {
   val id = newTxId()
   importTx(id, data)
   signTx(id, key)
-  return exportTx(id)
+  return id to exportTx(id)
 }
 
 suspend fun importTx(txnId: Int, data: String): dynamic {
@@ -172,18 +191,15 @@ suspend fun signAndPost(txnId: Int, key: String): Boolean {
   val txnpost = result.find{it.command == "txnpost"}
   console.log("txnpost status", txnpost.status)
   return txnpost.status as Boolean
-  
 }
 
 suspend fun signFloatingTx(myKey: String, sourceScriptAddress: String, targetAddress: String, tx: dynamic): Pair<Int, dynamic> {
   console.log("outputs", tx.transaction.outputs)
-  val outputIndex = (tx.transaction.outputs as Array<dynamic>).indexOfFirst { it.address == sourceScriptAddress }
-  val output = (tx.transaction.outputs as Array<dynamic>)[outputIndex]
-  val coindata = (tx.outputcoindata as Array<dynamic>)[outputIndex]
+  val output = (tx.transaction.outputs as Array<dynamic>).find { it.address == sourceScriptAddress }
   
   val txnId = newTxId()
   val txncreator = "txncreate id:$txnId;" +
-    "txninput id:$txnId coindata:$coindata floating:true;" +
+    "txninput id:$txnId address:${output.address} amount:${output.amount} tokenid:${output.tokenid} floating:true;" +
     "txnoutput id:$txnId amount:${output.amount} address:$targetAddress;" +
     "txnsign id:$txnId publickey:$myKey;"
   
@@ -192,3 +208,8 @@ suspend fun signFloatingTx(myKey: String, sourceScriptAddress: String, targetAdd
   return txnId to txnoutput.response
 }
 
+suspend fun post(txnId: Int): dynamic {
+  val txncreator = "txnbasics id:$txnId;txnpost id:$txnId;"
+  val result = (MDS.cmd(txncreator) as Array<dynamic>).last()
+  return result.response
+}

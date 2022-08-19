@@ -6,7 +6,7 @@ import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.decodeFromDynamic
 import minima.*
 import ui.eltooScriptAddress
-import ui.eltooScriptBalances
+import ui.eltooScriptCoins
 import ui.multisigScriptAddress
 import ui.multisigScriptBalances
 import kotlin.random.Random
@@ -47,10 +47,10 @@ fun init() {
             multisigScriptBalances.addAll(getBalances(multisigScriptAddress))
           }
         }
-        if (eltooScriptAddress.isNotEmpty() && eltooScriptBalances.none { it.confirmed > ZERO }) {
+        if (eltooScriptAddress.isNotEmpty() && eltooScriptCoins.isEmpty()) {
           scope.launch {
-            eltooScriptBalances.clear()
-            eltooScriptBalances.addAll(getBalances(eltooScriptAddress))
+            eltooScriptCoins.clear()
+            eltooScriptCoins.addAll(getCoins(address = eltooScriptAddress, sendable = false))
           }
         }
       }
@@ -60,7 +60,7 @@ fun init() {
 
 @OptIn(ExperimentalSerializationApi::class)
 suspend fun getBalances(address: String? = null): List<Balance> {
-  val balance = MDS.cmd(address?.let{"balance address:$address"} ?: "balance")
+  val balance = MDS.cmd("balance ${address?.let{"address:$address "} ?:""}confirmations:1")
   val balances = balance.response as Array<dynamic>
   return balances.map {
     try {
@@ -94,13 +94,13 @@ suspend fun deployScript(text: String): String {
   return newscript.response.address
 }
 
-suspend fun getCoins(tokenId: String): List<Coin> {
-  val coinSimple = MDS.cmd("coins tokenid:$tokenId sendable:true")
+suspend fun getCoins(tokenId: String? = null, address: String? = null, sendable: Boolean): List<Coin> {
+  val coinSimple = MDS.cmd("coins ${tokenId?.let{"tokenid:$tokenId "} ?:""} ${address?.let{"address:$address "} ?:""}sendable:$sendable")
   val coins = json.decodeFromDynamic<Array<Coin>>(coinSimple.response)
   return coins.sortedBy { it.amount }
 }
 
-suspend fun post(toAddress: String, amount: BigDecimal, tokenId: String) {
+suspend fun send(toAddress: String, amount: BigDecimal, tokenId: String) {
   val txnId = newTxId()
   val inputs = mutableListOf<Coin>()
   val outputs = mutableListOf<Output>()
@@ -121,10 +121,10 @@ data class Output(val address: String, val amount: BigDecimal, val token: String
 
 suspend fun coverShortage(tokenId: String, shortage: BigDecimal, inputs: MutableList<Coin>, outputs: MutableList<Output>) {
   
-  val coins = getCoins(tokenId).ofAtLeast(shortage)
+  val coins = getCoins(tokenId = tokenId, sendable = true).ofAtLeast(shortage)
   coins.forEach { inputs.add(it) }
   val change = coins.sumOf { it.tokenamount ?: it.amount } - shortage
-  if (change > BigDecimal.ZERO) outputs.add(Output(newAddress(), change, tokenId))
+  if (change > ZERO) outputs.add(Output(newAddress(), change, tokenId))
 }
 
 fun List<Coin>.ofAtLeast(amount: BigDecimal): List<Coin> {
@@ -133,7 +133,7 @@ fun List<Coin>.ofAtLeast(amount: BigDecimal): List<Coin> {
     ?: (listOf(last()) + take(size-1).ofAtLeast(amount - (last().tokenamount ?: last().amount)))
 }
 
-fun <T> Iterable<T>.sumOf(selector: (T) -> BigDecimal) = fold(BigDecimal.ZERO) { acc, item -> acc + selector(item) }
+fun <T> Iterable<T>.sumOf(selector: (T) -> BigDecimal) = fold(ZERO) { acc, item -> acc + selector(item) }
 
 suspend fun fundingTx(toAddress: String, amount: BigDecimal, tokenId: String): Pair<Int, dynamic> {
   val txnId = newTxId()
@@ -184,8 +184,8 @@ suspend fun importTx(txnId: Int, data: String): dynamic {
 
 suspend fun signAndPost(txnId: Int, key: String): Boolean {
   val txncreator = "txnsign id:$txnId publickey:$key;" +
-    "txnbasics id:$txnId;" +
-    "txnpost id:$txnId;" +
+//    "txnbasics id:$txnId;" +
+    "txnpost id:$txnId auto:true;" +
     "txndelete id:$txnId;"
   val result = MDS.cmd(txncreator) as Array<dynamic>
   val txnpost = result.find{it.command == "txnpost"}
@@ -193,13 +193,14 @@ suspend fun signAndPost(txnId: Int, key: String): Boolean {
   return txnpost.status as Boolean
 }
 
-suspend fun signFloatingTx(myKey: String, sourceScriptAddress: String, targetAddress: String, tx: dynamic): Pair<Int, dynamic> {
+suspend fun signFloatingTx(myKey: String, sourceScriptAddress: String, targetAddress: String, tx: dynamic, states: Map<Int, String> = emptyMap()): Pair<Int, dynamic> {
   console.log("outputs", tx.transaction.outputs)
   val output = (tx.transaction.outputs as Array<dynamic>).find { it.address == sourceScriptAddress }
   
   val txnId = newTxId()
   val txncreator = "txncreate id:$txnId;" +
     "txninput id:$txnId address:${output.address} amount:${output.amount} tokenid:${output.tokenid} floating:true;" +
+    states.mapNotNull { (index, value) -> value.takeUnless { it.isEmpty() }?.let {"txnstate id:$txnId port:$index value:$value;" } }.joinToString("") +
     "txnoutput id:$txnId amount:${output.amount} address:$targetAddress;" +
     "txnsign id:$txnId publickey:$myKey;"
   
@@ -209,7 +210,7 @@ suspend fun signFloatingTx(myKey: String, sourceScriptAddress: String, targetAdd
 }
 
 suspend fun post(txnId: Int): dynamic {
-  val txncreator = "txnbasics id:$txnId;txnpost id:$txnId;"
-  val result = (MDS.cmd(txncreator) as Array<dynamic>).last()
+  val txncreator = "txnpost id:$txnId auto:true;"
+  val result = MDS.cmd(txncreator)
   return result.response
 }

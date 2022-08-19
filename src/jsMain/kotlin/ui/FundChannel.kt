@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import minima.Balance
+import minima.Coin
 import newAddress
 import newKey
 import newTxId
@@ -21,6 +22,7 @@ import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLVideoElement
+import post
 import scope
 import signAndPost
 import signFloatingTx
@@ -31,7 +33,7 @@ import triggerScript
 var multisigScriptAddress by mutableStateOf("")
 var eltooScriptAddress by mutableStateOf("")
 val multisigScriptBalances = mutableStateListOf<Balance>()
-val eltooScriptBalances = mutableStateListOf<Balance>()
+val eltooScriptCoins = mutableStateListOf<Coin>()
 
 @Composable
 fun FundChannel() {
@@ -138,7 +140,16 @@ fun FundChannel() {
       Br()
     }
     triggerTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
-      ChannelFundingView(multisigScriptAddress.isNotEmpty(), multisigScriptBalances, eltooScriptBalances, trigger, settle)
+      ChannelFundingView(multisigScriptAddress.isNotEmpty(), multisigScriptBalances, eltooScriptCoins,
+        {
+          post(trigger)
+          triggerTxStatus += " and posted!"
+        },
+        {
+          post(settle)
+          settlementTxStatus += " and posted!"
+        }
+      )
     }}
     if (listOf(myTriggerKey, mySettleKey, myUpdateKey, otherTriggerKey, otherSettleKey, otherUpdateKey).all(String::isNotEmpty)) {
       NumberInput(amount, min = 0) {
@@ -169,9 +180,9 @@ fun FundChannel() {
             val (fundingTxId, fundingTx) = fundingTx(multisigScriptAddress, amount.toBigDecimal(), tokenId)
             fundingTxStatus = "Funding transaction created"
             val myAddress = newAddress()
-            val (triggerTxId, triggerTx) = signFloatingTx(myTriggerKey, multisigScriptAddress, eltooScriptAddress, fundingTx)
+            val (triggerTxId, triggerTx) = signFloatingTx(myTriggerKey, multisigScriptAddress, eltooScriptAddress, fundingTx, mapOf(99 to "0"))
             triggerTxStatus = "Trigger transaction created, signed"
-            val (settlementTxId, settlementTx) = signFloatingTx(mySettleKey, eltooScriptAddress, myAddress, triggerTx)
+            val (settlementTxId, settlementTx) = signFloatingTx(mySettleKey, eltooScriptAddress, myAddress, triggerTx, mapOf(99 to "0"))
             settlementTxStatus = "Settlement transaction created, signed"
             val exportedTriggerTx = exportTx(triggerTxId)
             val exportedSettlementTx = exportTx(settlementTxId)

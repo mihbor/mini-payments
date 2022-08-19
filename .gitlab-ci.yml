@@ -11,7 +11,7 @@ build:
   script: gradle --build-cache minidappDistribution
   artifacts:
     paths:
-      - build/minidapp/miniPayments.minidapp
+      - build/minidapp/mini-payments.mds.zip
   cache:
     key: "$CI_COMMIT_REF_NAME"
     policy: push

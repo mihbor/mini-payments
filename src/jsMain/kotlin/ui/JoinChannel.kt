@@ -16,6 +16,7 @@ import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Text
 import org.jetbrains.compose.web.dom.Video
 import org.w3c.dom.HTMLCanvasElement
+import post
 import scope
 import store
 import subscribe
@@ -96,7 +97,16 @@ fun JoinChannel() {
       Br()
     }
     triggerTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
-      ChannelFundingView(multisigScriptAddress.isNotEmpty(), multisigScriptBalances, eltooScriptBalances, trigger,settle)
+      ChannelFundingView(multisigScriptAddress.isNotEmpty(), multisigScriptBalances, eltooScriptCoins,
+        {
+          post(trigger)
+          triggerTxStatus += " and posted!"
+        },
+        {
+          post(settle)
+          settlementTxStatus += " and posted!"
+        }
+      )
     }}
   }
   Br()

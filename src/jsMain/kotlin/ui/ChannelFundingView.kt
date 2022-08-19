@@ -4,25 +4,24 @@ import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.coroutines.launch
 import minima.Balance
+import minima.Coin
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Text
-import post
 import scope
 
 @Composable
 fun ChannelFundingView(
   isFunded: Boolean,
   multisigScriptBalances: List<Balance>,
-  eltooScriptBalances: List<Balance>,
-  triggerTxId: Int,
-  settleTxId: Int
+  eltooScriptCoins: List<Coin>,
+  trigger: suspend () -> Unit,
+  complete: suspend () -> Unit
 ) {
   var settlementTriggered by remember { mutableStateOf(false) }
   var settlementCompleted by remember { mutableStateOf(false) }
   if (isFunded) {
-    Text("Channel funded!")
     Br()
     multisigScriptBalances.forEach {
       Text("[${it.tokenid}] token funding balance: ${it.confirmed.toPlainString()}")
@@ -31,25 +30,29 @@ fun ChannelFundingView(
     if (multisigScriptBalances.any { it.confirmed > BigDecimal.ZERO }) {
       Button({
         onClick {
-          scope.launch { post(triggerTxId) }
           settlementTriggered = true
+          scope.launch {
+            trigger()
+            settlementTriggered = false
+          }
         }
         if (settlementTriggered) disabled()
       }) {
         Text("Trigger settlement!")
       }
       Br()
-      if (settlementTriggered) {
-        eltooScriptBalances.forEach {
-          Text("[${it.tokenid}] token eltoo balance: ${it.confirmed.toPlainString()}")
-          Br()
-        }
+      eltooScriptCoins.forEach {
+        Text("[${it.tokenid}] token eltoo coin: ${it.tokenamount?.toPlainString() ?: it.amount.toPlainString()}")
+        Br()
       }
-      if (eltooScriptBalances.any { it.confirmed > BigDecimal.ZERO }) {
+      if (eltooScriptCoins.isNotEmpty()) {
         Button({
           onClick {
-            scope.launch { post(settleTxId) }
             settlementCompleted = true
+            scope.launch {
+              complete()
+              settlementCompleted = false
+            }
           }
           if (settlementCompleted) disabled()
         }) {

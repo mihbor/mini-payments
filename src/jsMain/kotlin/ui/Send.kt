@@ -9,8 +9,8 @@ import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLVideoElement
-import post
 import scope
+import send
 
 @Composable
 fun Send() {
@@ -73,7 +73,7 @@ fun Send() {
         showSend = false
         qrScanner?.stop()
         scope.launch {
-          post(toAddress, amount.toBigDecimal(), tokenId)
+          send(toAddress, amount.toBigDecimal(), tokenId)
         }
       }
     }) {

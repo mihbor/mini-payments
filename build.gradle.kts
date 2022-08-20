@@ -23,10 +23,10 @@ kotlin {
       dependencies {
         implementation(compose.web.core)
         implementation(compose.runtime)
-        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.1")
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
         
-        implementation("com.ionspin.kotlin:bignum:0.3.3")
-        implementation("com.ionspin.kotlin:bignum-serialization-kotlinx:0.3.3")
+        implementation("com.ionspin.kotlin:bignum:0.3.4")
+        implementation("com.ionspin.kotlin:bignum-serialization-kotlinx:0.3.4")
   
         implementation("dev.gitlive:firebase-firestore-js:$firebaseSdkVersion")
         

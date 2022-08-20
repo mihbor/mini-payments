@@ -32,6 +32,7 @@ fun JoinChannel() {
   var settlementTxStatus by remember { mutableStateOf("") }
   var triggerTransactionId by remember { mutableStateOf<Int?>(null) }
   var settlementTransactionId by remember { mutableStateOf<Int?>(null) }
+  var timeLock by remember { mutableStateOf(10) }
   
   Button({
     onClick {
@@ -50,7 +51,7 @@ fun JoinChannel() {
             subscribe("$myTriggerKey;$myUpdateKey;$mySettleKey").onEach { msg ->
               console.log("funding tx msg", msg)
               val splits = msg.split(";")
-              val timeLock = splits[0].toInt()
+              timeLock = splits[0].toInt()
               val otherTriggerKey = splits[1]
               val otherUpdateKey = splits[2]
               val otherSettleKey = splits[3]
@@ -97,7 +98,7 @@ fun JoinChannel() {
       Br()
     }
     triggerTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
-      ChannelFundingView(multisigScriptAddress.isNotEmpty(), multisigScriptBalances, eltooScriptCoins,
+      ChannelFundingView(multisigScriptAddress.isNotEmpty(), timeLock, multisigScriptBalances, eltooScriptCoins,
         {
           post(trigger)
           triggerTxStatus += " and posted!"

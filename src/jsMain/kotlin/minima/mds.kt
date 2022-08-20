@@ -51,54 +51,54 @@ object MDS {
    */
   fun init(callback: Callback) {
     //Log a little..
-    MDS.log("Initialising MDS..")
+    log("Initialising .")
     
     //Is logging enabled via the URL
-    if(MDS.form.getParams("MDS_LOGGING") != null){
-      MDS.logging = true;
+    if(form.getParams("MDS_LOGGING") != null){
+      logging = true;
     }
     
     //Get the host and port
     var host = window.location.hostname
     var port = 9003//window.location.port.toInt()
     
-    if(MDS.logging){
-      MDS.log("Location : "+window.location)
-      MDS.log("Host     : "+host)
-      MDS.log("port     : "+port)
+    if(logging){
+      log("Location : "+window.location)
+      log("Host     : "+host)
+      log("port     : "+port)
     }
     
     //Get their MiniDAPP UID
-    MDS.minidappuid = MDS.form.getParams("uid")
+    minidappuid = form.getParams("uid")
     
     //HARD SET if debug mode - running from a file
-    MDS.DEBUG_HOST?.let{
+    DEBUG_HOST?.let{
       
-      MDS.log("DEBUG Settings Found..");
+      log("DEBUG Settings Found..");
       
       host = it
-      port = MDS.DEBUG_PORT
+      port = DEBUG_PORT
     }
     
-    if(MDS.minidappuid == null){
-      MDS.minidappuid = MDS.DEBUG_MINIDAPPID
+    if(minidappuid == null){
+      minidappuid = DEBUG_MINIDAPPID
     }
     
     //Is one specified..
-    if(MDS.minidappuid == "0x00"){
-      MDS.log("No MiniDAPP UID specified.. using test value")
+    if(minidappuid == "0x00"){
+      log("No MiniDAPP UID specified.. using test value")
     }
     
-    if(MDS.logging){
-      MDS.log("MDS UID  : "+MDS.minidappuid)
+    if(logging){
+      log("MDS UID  : "+minidappuid)
     }
     
     val mainport 	= port+1
     
-    MDS.log("MDS FILEHOST  : https://$host:$port/")
+    log("MDS FILEHOST  : https://$host:$port/")
     
     mainhost 	= "https://$host:$mainport/"
-    MDS.log("MDS MAINHOST : "+ mainhost)
+    log("MDS MAINHOST : "+ mainhost)
     
     //Store this for poll messages
     MDS_MAIN_CALLBACK = callback

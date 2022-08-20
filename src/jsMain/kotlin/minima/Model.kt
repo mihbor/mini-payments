@@ -30,7 +30,8 @@ data class Coin(
   val tokenamount: BigDecimal? = amount,
   val coinid: String,
   val storestate: Boolean,
-  val tokenid: String
+  val tokenid: String,
+  val created: String
 )
 
 @Serializable

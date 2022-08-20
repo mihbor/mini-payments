@@ -1,6 +1,7 @@
 package ui
 
 import androidx.compose.runtime.*
+import blockNumber
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.coroutines.launch
 import minima.Balance
@@ -14,6 +15,7 @@ import scope
 @Composable
 fun ChannelFundingView(
   isFunded: Boolean,
+  timeLock: Int,
   multisigScriptBalances: List<Balance>,
   eltooScriptCoins: List<Coin>,
   trigger: suspend () -> Unit,
@@ -42,7 +44,8 @@ fun ChannelFundingView(
       }
       Br()
       eltooScriptCoins.forEach {
-        Text("[${it.tokenid}] token eltoo coin: ${it.tokenamount?.toPlainString() ?: it.amount.toPlainString()}")
+        Text("[${it.tokenid}] token eltoo coin: ${it.tokenamount?.toPlainString() ?: it.amount.toPlainString()} timelock ${
+          (it.created.toInt() + timeLock - blockNumber).takeIf { it > 0 }?.let { "ends in $it blocks" } ?: "ended"}")
         Br()
       }
       if (eltooScriptCoins.isNotEmpty()) {

@@ -1,7 +1,7 @@
 package ui
 
 import androidx.compose.runtime.*
-import com.ionspin.kotlin.bignum.decimal.toBigDecimal
+import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import deployScript
 import eltooScript
 import exportTx
@@ -39,7 +39,7 @@ val eltooScriptCoins = mutableStateListOf<Coin>()
 fun FundChannel() {
   var showFundChannel by remember { mutableStateOf(false) }
   var showFundScanner by remember { mutableStateOf(false) }
-  var amount by remember { mutableStateOf(0.0) }
+  var amount by remember { mutableStateOf(ZERO) }
   var tokenId by remember { mutableStateOf("0x00") }
   var timeLock by remember { mutableStateOf(10) }
   var myTriggerKey by remember { mutableStateOf("") }
@@ -140,7 +140,7 @@ fun FundChannel() {
       Br()
     }
     triggerTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
-      ChannelFundingView(multisigScriptAddress.isNotEmpty(), multisigScriptBalances, eltooScriptCoins,
+      ChannelFundingView(multisigScriptAddress.isNotEmpty(), timeLock, multisigScriptBalances, eltooScriptCoins,
         {
           post(trigger)
           triggerTxStatus += " and posted!"
@@ -152,11 +152,8 @@ fun FundChannel() {
       )
     }}
     if (listOf(myTriggerKey, mySettleKey, myUpdateKey, otherTriggerKey, otherSettleKey, otherUpdateKey).all(String::isNotEmpty)) {
-      NumberInput(amount, min = 0) {
-        if (fundingTxStatus.isNotEmpty()) disabled()
-        onInput {
-          amount = it.value!!.toDouble()
-        }
+      DecimalNumberInput(amount, min = ZERO, disabled = fundingTxStatus.isNotEmpty()) {
+        it?.let { amount = it }
       }
       TokenSelect(tokenId, fundingTxStatus.isNotEmpty()) {
         tokenId = it
@@ -177,7 +174,7 @@ fun FundChannel() {
             multisigScriptAddress = deployScript(triggerScript(myTriggerKey, otherTriggerKey))
             eltooScriptAddress = deployScript(eltooScript(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
             console.log("multisig address (fund)", multisigScriptAddress)
-            val (fundingTxId, fundingTx) = fundingTx(multisigScriptAddress, amount.toBigDecimal(), tokenId)
+            val (fundingTxId, fundingTx) = fundingTx(multisigScriptAddress, amount, tokenId)
             fundingTxStatus = "Funding transaction created"
             val myAddress = newAddress()
             val (triggerTxId, triggerTx) = signFloatingTx(myTriggerKey, multisigScriptAddress, eltooScriptAddress, fundingTx, mapOf(99 to "0"))

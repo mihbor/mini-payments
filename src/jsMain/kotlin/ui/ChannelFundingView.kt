@@ -29,7 +29,7 @@ fun ChannelFundingView(
       Text("[${it.tokenid}] token funding balance: ${it.confirmed.toPlainString()}")
       Br()
     }
-    if (multisigScriptBalances.any { it.confirmed > BigDecimal.ZERO }) {
+    if (multisigScriptBalances.any { it.unconfirmed > BigDecimal.ZERO }) {
       Button({
         onClick {
           settlementTriggered = true

@@ -1,5 +1,6 @@
 import kotlinx.coroutines.MainScope
 import minima.MDS
+import org.jetbrains.compose.web.dom.A
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Text
 import org.jetbrains.compose.web.renderComposableInBody
@@ -15,6 +16,10 @@ fun main() {
   init()
   
   renderComposableInBody {
+    A("minipay.apk") {
+      Text("Download standalone Android app")
+    }
+    Br()
     Text("UID: ${MDS.minidappuid}")
     Br()
     Receive()

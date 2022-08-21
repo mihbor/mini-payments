@@ -1,8 +1,11 @@
 package ui
 
 import androidx.compose.runtime.*
+import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.browser.document
+import kotlinx.browser.window
 import kotlinx.coroutines.launch
+import minima.MDS
 import newAddress
 import org.jetbrains.compose.web.css.DisplayStyle
 import org.jetbrains.compose.web.css.LineStyle
@@ -19,9 +22,9 @@ import scope
 
 val QRCode = require("qrcode")
 
-fun drawQR(address: String, tokenId:String) {
+fun drawQR(address: String, tokenId:String, amount:String = "") {
   val canvas = document.getElementById("receiveQR") as HTMLCanvasElement
-  QRCode.toCanvas(canvas, "$address;$tokenId", { error ->
+  QRCode.toCanvas(canvas, "$address;$tokenId;$amount", { error ->
     if (error != null) console.error(error)
     else console.log("qr generated")
   })
@@ -37,6 +40,8 @@ fun Receive() {
   var showReceive by remember { mutableStateOf(false) }
   var myAddress by remember { mutableStateOf("") }
   var tokenId by remember { mutableStateOf("") }
+  var amount by remember { mutableStateOf(BigDecimal.ZERO) }
+  
   Button({
     onClick {
       showReceive = !showReceive
@@ -60,6 +65,17 @@ fun Receive() {
     TokenSelect(tokenId) {
       tokenId = it
       drawQR(myAddress, tokenId)
+    }
+    DecimalNumberInput(amount, min = BigDecimal.ZERO) {
+      it?.let { amount = it }
+    }
+    Button({
+      onClick {
+        console.log("nfc emit")
+        window.open("minipay://localhost:9004/emit?uid=${MDS.minidappuid}&address=$myAddress&token=$tokenId&amount=${amount.toPlainString()}")
+      }
+    }) {
+      Text("Request on NFC (android only)")
     }
   }
   Br()

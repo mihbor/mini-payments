@@ -27,7 +27,7 @@ fun DecimalNumberInput(
   }
 }
 
-private fun String.toBigDecimalOrNull(): BigDecimal? {
+fun String.toBigDecimalOrNull(): BigDecimal? {
   return try {
     toBigDecimal()
   } catch (e: Exception) {

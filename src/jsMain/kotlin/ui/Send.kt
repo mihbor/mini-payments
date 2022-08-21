@@ -1,10 +1,12 @@
 package ui
 
 import androidx.compose.runtime.*
-import com.ionspin.kotlin.bignum.decimal.toBigDecimal
+import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import externals.QrScanner
 import kotlinx.browser.document
+import kotlinx.browser.window
 import kotlinx.coroutines.launch
+import minima.MDS
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
@@ -18,7 +20,7 @@ fun Send() {
   var showSend by remember { mutableStateOf(false) }
   var showCam by remember { mutableStateOf(false) }
   var toAddress by remember { mutableStateOf("") }
-  var amount by remember { mutableStateOf(0.0) }
+  var amount by remember { mutableStateOf(ZERO) }
   var tokenId by remember { mutableStateOf("0x00") }
   var qrScanner: QrScanner? by remember { mutableStateOf(null) }
   
@@ -33,7 +35,7 @@ fun Send() {
           val splits = result.split(";")
           toAddress = splits[0]
           if (splits.size > 1 && splits[1].isNotEmpty()) tokenId = splits[1]
-          if (splits.size > 2 && splits[2].isNotEmpty()) amount = splits[2].toDouble()
+          if (splits.size > 2 && splits[2].isNotEmpty()) splits[2].toBigDecimalOrNull()?.let { amount = it }
           qrScanner!!.stop()
           showCam = false
         }.also { it.start() }
@@ -58,13 +60,19 @@ fun Send() {
         width(400.px)
       }
     }
-    NumberInput(amount, min = 0) {
-      onInput {
-        amount = it.value!!.toDouble()
-      }
+    DecimalNumberInput(amount, min = ZERO) {
+      it?.let { amount = it }
     }
     TokenSelect(tokenId) {
       tokenId = it
+    }
+    Button({
+      onClick {
+        console.log("nfc read")
+        window.open("minipay://localhost:9004/read?uid=${MDS.minidappuid}")
+      }
+    }) {
+      Text("Read NFC (android only)")
     }
     Button({
       if(amount <= 0 || toAddress.isEmpty()) disabled()
@@ -73,7 +81,7 @@ fun Send() {
         showSend = false
         qrScanner?.stop()
         scope.launch {
-          send(toAddress, amount.toBigDecimal(), tokenId)
+          send(toAddress, amount, tokenId)
         }
       }
     }) {

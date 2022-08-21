@@ -46,7 +46,7 @@ fun init() {
       }
       "NEWBLOCK" -> {
         blockNumber = (msg.data.txpow.header.block as String).toInt()
-        if (multisigScriptAddress.isNotEmpty() && multisigScriptBalances.none { it.confirmed > ZERO }) {
+        if (multisigScriptAddress.isNotEmpty() && multisigScriptBalances.none { it.unconfirmed > ZERO }) {
           scope.launch {
             multisigScriptBalances.clear()
             multisigScriptBalances.addAll(getBalances(multisigScriptAddress))
@@ -65,7 +65,7 @@ fun init() {
 
 @OptIn(ExperimentalSerializationApi::class)
 suspend fun getBalances(address: String? = null): List<Balance> {
-  val balance = MDS.cmd("balance ${address?.let{"address:$address "} ?:""}confirmations:1")
+  val balance = MDS.cmd("balance ${address?.let{"address:$address "} ?:""}")
   val balances = balance.response as Array<dynamic>
   return balances.map {
     try {

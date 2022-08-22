@@ -72,7 +72,7 @@ fun Send() {
         window.open("minipay://localhost:9004/read?uid=${MDS.minidappuid}")
       }
     }) {
-      Text("Read NFC (android only)")
+      Text("Read NFC (in Android app)")
     }
     Button({
       if(amount <= 0 || toAddress.isEmpty()) disabled()
@@ -85,7 +85,7 @@ fun Send() {
         }
       }
     }) {
-      Text("Post")
+      Text("Send!")
     }
   }
   Br()

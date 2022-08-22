@@ -75,7 +75,7 @@ fun Receive() {
         window.open("minipay://localhost:9004/emit?uid=${MDS.minidappuid}&address=$myAddress&token=$tokenId&amount=${amount.toPlainString()}")
       }
     }) {
-      Text("Request on NFC (android only)")
+      Text("Request on NFC (in Android app)")
     }
   }
   Br()

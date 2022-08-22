@@ -105,7 +105,7 @@ suspend fun getCoins(tokenId: String? = null, address: String? = null, sendable:
   return coins.sortedBy { it.amount }
 }
 
-suspend fun send(toAddress: String, amount: BigDecimal, tokenId: String) {
+suspend fun send(toAddress: String, amount: BigDecimal, tokenId: String): Boolean {
   val txnId = newTxId()
   val inputs = mutableListOf<Coin>()
   val outputs = mutableListOf<Output>()
@@ -119,7 +119,10 @@ suspend fun send(toAddress: String, amount: BigDecimal, tokenId: String) {
     "txnpost id:$txnId auto:true;" +
     "txndelete id:$txnId;"
   
-  val result = MDS.cmd(txncreator)
+  val result = MDS.cmd(txncreator) as Array<dynamic>
+  val txnpost = result.find{it.command == "txnpost"}
+  console.log("send", txnpost.status)
+  return txnpost.status
 }
 
 data class Output(val address: String, val amount: BigDecimal, val token: String)

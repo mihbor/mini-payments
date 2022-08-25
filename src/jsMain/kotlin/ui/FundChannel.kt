@@ -1,6 +1,7 @@
 package ui
 
 import androidx.compose.runtime.*
+import channelUpdate
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import eltooScript
 import externals.QrScanner
@@ -11,6 +12,8 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
+import kotlinx.serialization.json.jsonArray
 import minima.*
 import newTxId
 import org.jetbrains.compose.web.attributes.disabled
@@ -23,7 +26,6 @@ import signFloatingTx
 import store
 import subscribe
 import triggerScript
-import updateChannel
 
 var multisigScriptAddress by mutableStateOf("")
 var eltooScriptAddress by mutableStateOf("")
@@ -47,7 +49,7 @@ fun FundChannel() {
   var fundingTxStatus by remember { mutableStateOf("") }
   var triggerTxStatus by remember { mutableStateOf("") }
   var settlementTxStatus by remember { mutableStateOf("") }
-  var triggerTransactionId by remember { mutableStateOf<Int?>(null) }
+  var updateTransactionId by remember { mutableStateOf<Int?>(null) }
   var settlementTransactionId by remember { mutableStateOf<Int?>(null) }
   var channelBalance by remember { mutableStateOf(ZERO to ZERO) }
   var settlementTransaction by remember { mutableStateOf<JsonObject?>(null) }
@@ -138,7 +140,7 @@ fun FundChannel() {
       Text(it)
       Br()
     }
-    triggerTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
+    updateTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
       ChannelView(
         multisigScriptAddress.isNotEmpty(),
         timeLock,
@@ -205,11 +207,16 @@ fun FundChannel() {
             subscribe(channelKey(myTriggerKey, myUpdateKey, mySettleKey)).onEach { msg ->
               console.log("tx msg", msg)
               val splits = msg.split(";")
-              if (splits.size == 2) updateChannel(splits[0], splits[1], myUpdateKey, mySettleKey)
-              else {
+              if (splits[0].startsWith("TXN_UPDATE")) {
+                val (updateTxId, settleTx) = channelUpdate(splits[0].endsWith("_ACK"), splits[1], splits[2], myUpdateKey, mySettleKey, channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey))
+                updateTransactionId = updateTxId
+                settlementTransaction = settleTx
+                val outputs = settleTx["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
+                channelBalance = outputs.find { it.miniaddress == myAddress }!!.amount to outputs.find { it.miniaddress == counterPartyAddress }!!.amount
+              } else {
                 val (address, triggerTx, settlementTx) = splits
                 counterPartyAddress = address
-                triggerTransactionId = newTxId().also {
+                updateTransactionId = newTxId().also {
                   importTx(it, triggerTx)
                 }
                 triggerTxStatus += ", received back"

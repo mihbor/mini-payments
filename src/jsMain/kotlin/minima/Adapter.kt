@@ -12,7 +12,8 @@ data class Output(
   val address: String,
   @Contextual
   val amount: BigDecimal,
-  val tokenid: String
+  val tokenid: String,
+  val miniaddress: String = ""
 )
 
 typealias Input = Output

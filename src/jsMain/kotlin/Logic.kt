@@ -152,8 +152,9 @@ suspend fun requestViaChannel(
   myUpdateKey: String,
   mySettleKey: String,
   counterPartyAddress: String,
-  currentSettlementTx: JsonObject
-) = sendViaChannel(-amount, channelBalance, myAddress, myUpdateKey, mySettleKey, counterPartyAddress, currentSettlementTx)
+  currentSettlementTx: JsonObject,
+  channelKey: String
+) = sendViaChannel(-amount, channelBalance, myAddress, myUpdateKey, mySettleKey, counterPartyAddress, currentSettlementTx, channelKey)
 
 suspend fun sendViaChannel(
   amount: BigDecimal,
@@ -162,8 +163,9 @@ suspend fun sendViaChannel(
   myUpdateKey: String,
   mySettleKey: String,
   counterPartyAddress: String,
-  currentSettlementTx: JsonObject
-): Pair<String, String> {
+  currentSettlementTx: JsonObject,
+  channelKey: String
+) {
   val input = json.decodeFromJsonElement<Input>(currentSettlementTx["inputs"]!!.jsonArray.first())
   val state = currentSettlementTx["state"]!!.jsonArray.find{ it.jsonObject["port"]!!.jsonPrimitive.int == 99 }!!.jsonObject["data"]!!.jsonPrimitive.content
   val updateTxnId = newTxId()
@@ -184,15 +186,21 @@ suspend fun sendViaChannel(
     "txnexport id:$settleTxnId;"
   val settleTxn = (MDS.cmd(settletxncreator) as Array<dynamic>).last()
   
-  return updateTxn.response.data as String to settleTxn.response.data as String
+  store(channelKey, listOf(if(amount > ZERO) "TXN_UPDATE" else "TXN_REQUEST", updateTxn.response.data, settleTxn.response.data).joinToString(";"))
 }
 
-suspend fun updateChannel(updateTx: String, settleTx: String, myUpdateKey: String, mySettleKey: String): Pair<JsonObject, JsonObject> {
+suspend fun channelUpdate(isAck: Boolean, updateTx: String, settleTx: String, myUpdateKey: String, mySettleKey: String, channelKey: String): Pair<Int, JsonObject> {
   console.log("Updating channel")
   val updateTxnId = newTxId()
-  val importedUpdateTx = importTx(updateTxnId, updateTx)
+  importTx(updateTxnId, updateTx)
   val settleTxnId = newTxId()
   val importedSettleTx = importTx(settleTxnId, settleTx)
   
-  return json.decodeFromJsonElement<JsonObject>(importedUpdateTx) to json.decodeFromJsonElement(importedSettleTx)
+  if (!isAck) {
+    val signedUpdateTx = signAndExportTx(updateTxnId, myUpdateKey)
+    val signedSettleTx = signAndExportTx(settleTxnId, mySettleKey)
+    store(channelKey, listOf("TXN_UPDATE_ACK", signedUpdateTx, signedSettleTx).joinToString(";"))
+  }
+  
+  return updateTxnId to json.decodeFromJsonElement(importedSettleTx)
 }

@@ -8,9 +8,9 @@ import kotlinx.serialization.json.JsonObject
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Text
+import requestViaChannel
 import scope
 import sendViaChannel
-import store
 
 @Composable
 fun ChannelTransfers(
@@ -30,8 +30,7 @@ fun ChannelTransfers(
     Button({
       onClick {
         scope.launch {
-          val txPair = sendViaChannel(amount, channelBalance, myAddress, myUpdateKey, mySettleKey, counterPartyAddress, currentSettlementTx)
-          store(channelKey, with(txPair) { "$first;$second" })
+          sendViaChannel(amount, channelBalance, myAddress, myUpdateKey, mySettleKey, counterPartyAddress, currentSettlementTx, channelKey)
         }
       }
     }) {
@@ -44,7 +43,9 @@ fun ChannelTransfers(
     DecimalNumberInput(amount, min = ZERO, max = channelBalance.second) { it?.let { amount = it } }
     Button({
       onClick {
-    
+        scope.launch {
+          requestViaChannel(amount, channelBalance, myAddress, myUpdateKey, mySettleKey, counterPartyAddress, currentSettlementTx, channelKey)
+        }
       }
     }) {
       Text("Request via channel")

@@ -1,8 +1,8 @@
 package ui
 
 import androidx.compose.runtime.*
+import channelUpdate
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
-import com.ionspin.kotlin.bignum.decimal.toBigDecimal
 import eltooScript
 import kotlinx.browser.document
 import kotlinx.coroutines.flow.launchIn
@@ -10,9 +10,8 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import minima.*
 import newTxId
 import org.jetbrains.compose.web.css.*
@@ -26,7 +25,6 @@ import signAndExportTx
 import store
 import subscribe
 import triggerScript
-import updateChannel
 
 @Composable
 fun JoinChannel() {
@@ -39,7 +37,7 @@ fun JoinChannel() {
   var otherSettleKey by remember { mutableStateOf("") }
   var triggerTxStatus by remember { mutableStateOf("") }
   var settlementTxStatus by remember { mutableStateOf("") }
-  var triggerTransactionId by remember { mutableStateOf<Int?>(null) }
+  var updateTransactionId by remember { mutableStateOf<Int?>(null) }
   var settlementTransactionId by remember { mutableStateOf<Int?>(null) }
   var timeLock by remember { mutableStateOf(10) }
   var channelBalance by remember { mutableStateOf(ZERO to ZERO) }
@@ -64,23 +62,28 @@ fun JoinChannel() {
             subscribe(channelKey(myTriggerKey, myUpdateKey, mySettleKey)).onEach { msg ->
               console.log("tx msg", msg)
               val splits = msg.split(";")
-              if (splits.size == 2) updateChannel(splits[0], splits[1], myUpdateKey, mySettleKey)
-              else {
+              if (splits[0].startsWith("TXN_UPDATE")) {
+                val (updateTxId, settleTx) = channelUpdate(splits[0].endsWith("ACK"), splits[1], splits[2], myUpdateKey, mySettleKey, channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey))
+                updateTransactionId = updateTxId
+                settlementTransaction = settleTx
+                val outputs = settleTx["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
+                channelBalance = outputs.find { it.miniaddress == myAddress }!!.amount to outputs.find { it.miniaddress == counterPartyAddress }!!.amount
+              } else {
                 timeLock = splits[0].toInt()
                 otherTriggerKey = splits[1]
                 otherUpdateKey = splits[2]
                 otherSettleKey = splits[3]
                 val triggerTx = splits[4]
                 val settlementTx = splits[5]
-                triggerTransactionId = newTxId().also { triggerTxId ->
+                updateTransactionId = newTxId().also { triggerTxId ->
                   importTx(triggerTxId, triggerTx)
                   val signedTriggerTx = signAndExportTx(triggerTxId, myTriggerKey)
                   triggerTxStatus = "Trigger transaction receved, signed"
                   settlementTransactionId = newTxId().also { settlementTxId ->
                     settlementTransaction = importTx(settlementTxId, settlementTx).also {
-                      val output = it["outputs"]!!.jsonArray.first().jsonObject
-                      channelBalance = ZERO to output["amount"]!!.jsonPrimitive.content.toBigDecimal()
-                      counterPartyAddress = output["address"]!!.jsonPrimitive.content
+                      val output = json.decodeFromJsonElement<Output>(it["outputs"]!!.jsonArray.first())
+                      channelBalance = ZERO to output.amount
+                      counterPartyAddress = output.miniaddress
                     }
                     val signedSettlementTx = signAndExportTx(settlementTxId, mySettleKey)
                     settlementTransactionId = settlementTxId
@@ -126,7 +129,7 @@ fun JoinChannel() {
       Text(it)
       Br()
     }
-    triggerTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
+    updateTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
       ChannelView(
         multisigScriptAddress.isNotEmpty(),
         timeLock,

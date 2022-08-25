@@ -18,6 +18,7 @@ typealias Callback = ((dynamic) -> Unit)?
 
 val json = Json {
   serializersModule = bigDecimalHumanReadableSerializerModule
+  ignoreUnknownKeys = true
 }
 
 /**

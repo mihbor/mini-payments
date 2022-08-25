@@ -2,33 +2,28 @@ package ui
 
 import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
-import deployScript
 import eltooScript
-import exportTx
 import externals.QrScanner
 import fundingTx
-import importTx
 import kotlinx.browser.document
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import minima.Balance
-import minima.Coin
-import newAddress
-import newKey
+import kotlinx.serialization.json.JsonObject
+import minima.*
 import newTxId
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLVideoElement
-import post
 import scope
 import signAndPost
 import signFloatingTx
 import store
 import subscribe
 import triggerScript
+import updateChannel
 
 var multisigScriptAddress by mutableStateOf("")
 var eltooScriptAddress by mutableStateOf("")
@@ -54,6 +49,10 @@ fun FundChannel() {
   var settlementTxStatus by remember { mutableStateOf("") }
   var triggerTransactionId by remember { mutableStateOf<Int?>(null) }
   var settlementTransactionId by remember { mutableStateOf<Int?>(null) }
+  var channelBalance by remember { mutableStateOf(ZERO to ZERO) }
+  var settlementTransaction by remember { mutableStateOf<JsonObject?>(null) }
+  var myAddress by remember { mutableStateOf("") }
+  var counterPartyAddress by remember { mutableStateOf("") }
   
   Button({
     onClick {
@@ -140,7 +139,18 @@ fun FundChannel() {
       Br()
     }
     triggerTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
-      ChannelFundingView(multisigScriptAddress.isNotEmpty(), timeLock, multisigScriptBalances, eltooScriptCoins,
+      ChannelView(
+        multisigScriptAddress.isNotEmpty(),
+        timeLock,
+        multisigScriptBalances,
+        channelBalance,
+        myAddress,
+        myUpdateKey,
+        mySettleKey,
+        counterPartyAddress,
+        channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey),
+        settlementTransaction!!,
+        eltooScriptCoins,
         {
           post(trigger)
           triggerTxStatus += " and posted!"
@@ -175,35 +185,41 @@ fun FundChannel() {
             eltooScriptAddress = deployScript(eltooScript(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
             console.log("multisig address (fund)", multisigScriptAddress)
             val (fundingTxId, fundingTx) = fundingTx(multisigScriptAddress, amount, tokenId)
+            channelBalance = amount to ZERO
             fundingTxStatus = "Funding transaction created"
-            val myAddress = newAddress()
+            myAddress = getAddress()
             val (triggerTxId, triggerTx) = signFloatingTx(myTriggerKey, multisigScriptAddress, eltooScriptAddress, fundingTx, mapOf(99 to "0"))
             triggerTxStatus = "Trigger transaction created, signed"
-            val (settlementTxId, settlementTx) = signFloatingTx(mySettleKey, eltooScriptAddress, myAddress, triggerTx, mapOf(99 to "0"))
+            val (settlementTxId, _) = signFloatingTx(mySettleKey, eltooScriptAddress, myAddress, triggerTx, mapOf(99 to "0"))
             settlementTxStatus = "Settlement transaction created, signed"
             val exportedTriggerTx = exportTx(triggerTxId)
             val exportedSettlementTx = exportTx(settlementTxId)
             store(
-              "$otherTriggerKey;$otherUpdateKey;$otherSettleKey",
+              channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey),
               listOf(timeLock, myTriggerKey, myUpdateKey, mySettleKey, exportedTriggerTx, exportedSettlementTx).joinToString(";")
             )
             triggerTxStatus += ", sent"
             settlementTxStatus += ", sent"
   
             console.log("subscribing to", "$myTriggerKey;$myUpdateKey;$mySettleKey")
-            subscribe("$myTriggerKey;$myUpdateKey;$mySettleKey").onEach { msg ->
-              console.log("trigger and settlement tx msg", msg)
-              val (triggerTx, settlementTx) = msg.split(";")
-              triggerTransactionId = newTxId().also {
-                importTx(it, triggerTx)
+            subscribe(channelKey(myTriggerKey, myUpdateKey, mySettleKey)).onEach { msg ->
+              console.log("tx msg", msg)
+              val splits = msg.split(";")
+              if (splits.size == 2) updateChannel(splits[0], splits[1], myUpdateKey, mySettleKey)
+              else {
+                val (address, triggerTx, settlementTx) = splits
+                counterPartyAddress = address
+                triggerTransactionId = newTxId().also {
+                  importTx(it, triggerTx)
+                }
+                triggerTxStatus += ", received back"
+                settlementTransactionId = newTxId().also {
+                  settlementTransaction = importTx(it, settlementTx)
+                }
+                settlementTxStatus += ", received back"
+                signAndPost(fundingTxId, "auto")
+                fundingTxStatus += " and posted!"
               }
-              triggerTxStatus += ", received back"
-              settlementTransactionId = newTxId().also {
-                importTx(it, settlementTx)
-              }
-              settlementTxStatus += ", received back"
-              signAndPost(fundingTxId, "auto")
-              fundingTxStatus += " and posted!"
             }.onCompletion {
               console.log("completed")
             }.launchIn(scope)

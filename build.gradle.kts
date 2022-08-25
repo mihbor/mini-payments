@@ -15,7 +15,11 @@ repositories {
 
 kotlin {
   js(IR) {
-    browser()
+    browser{
+      commonWebpackConfig {
+        sourceMaps = true
+      }
+    }
     binaries.executable()
   }
   sourceSets {

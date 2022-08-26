@@ -28,10 +28,12 @@ fun ChannelView(
   currentSettlementTx: JsonObject,
   eltooScriptCoins: List<Coin>,
   trigger: suspend () -> Unit,
-  complete: suspend () -> Unit
+  complete: suspend () -> Unit,
+  update: (suspend () -> Unit)? = null,
 ) {
-  var settlementTriggered by remember { mutableStateOf(false) }
-  var settlementCompleted by remember { mutableStateOf(false) }
+  var settlementTriggering by remember { mutableStateOf(false) }
+  var settlementCompleting by remember { mutableStateOf(false) }
+  var updatePosting by remember { mutableStateOf(false) }
   if (isFunded) {
     Br()
     multisigScriptBalances.forEach {
@@ -42,13 +44,13 @@ fun ChannelView(
       ChannelTransfers(channelBalance, myAddress, myUpdateKey, mySettleKey, counterPartyAddress, channelKey, currentSettlementTx)
       Button({
         onClick {
-          settlementTriggered = true
+          settlementTriggering = true
           scope.launch {
             trigger()
-            settlementTriggered = false
+            settlementTriggering = false
           }
         }
-        if (settlementTriggered) disabled()
+        if (settlementTriggering) disabled()
       }) {
         Text("Trigger settlement!")
       }
@@ -60,15 +62,27 @@ fun ChannelView(
       Br()
     }
     if (eltooScriptCoins.isNotEmpty()) {
-      Button({
+      if (update != null) Button({
         onClick {
-          settlementCompleted = true
+          updatePosting = true
           scope.launch {
-            complete()
-            settlementCompleted = false
+            update()
+            updatePosting = false
           }
         }
-        if (settlementCompleted) disabled()
+        if (updatePosting) disabled()
+      }) {
+        Text("Post latest update")
+      }
+      Button({
+        if (settlementCompleting || updatePosting || eltooScriptCoins.any { it.created.toInt() + timeLock > blockNumber }) disabled()
+        onClick {
+          settlementCompleting = true
+          scope.launch {
+            complete()
+            settlementCompleting = false
+          }
+        }
       }) {
         Text("Complete settlement!")
       }

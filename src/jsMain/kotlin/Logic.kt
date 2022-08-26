@@ -189,7 +189,7 @@ suspend fun sendViaChannel(
   store(channelKey, listOf(if(amount > ZERO) "TXN_UPDATE" else "TXN_REQUEST", updateTxn.response.data, settleTxn.response.data).joinToString(";"))
 }
 
-suspend fun channelUpdate(isAck: Boolean, updateTx: String, settleTx: String, myUpdateKey: String, mySettleKey: String, channelKey: String): Pair<Int, JsonObject> {
+suspend fun channelUpdate(isAck: Boolean, updateTx: String, settleTx: String, myUpdateKey: String, mySettleKey: String, channelKey: String): Pair<Int, Pair<Int, JsonObject>> {
   console.log("Updating channel")
   val updateTxnId = newTxId()
   importTx(updateTxnId, updateTx)
@@ -202,5 +202,5 @@ suspend fun channelUpdate(isAck: Boolean, updateTx: String, settleTx: String, my
     store(channelKey, listOf("TXN_UPDATE_ACK", signedUpdateTx, signedSettleTx).joinToString(";"))
   }
   
-  return updateTxnId to json.decodeFromJsonElement(importedSettleTx)
+  return updateTxnId to (settleTxnId to json.decodeFromJsonElement(importedSettleTx))
 }

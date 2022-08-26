@@ -48,7 +48,9 @@ fun FundChannel() {
   var qrScanner: QrScanner? by remember { mutableStateOf(null) }
   var fundingTxStatus by remember { mutableStateOf("") }
   var triggerTxStatus by remember { mutableStateOf("") }
+  var updateTxStatus by remember { mutableStateOf("") }
   var settlementTxStatus by remember { mutableStateOf("") }
+  var triggerTransactionId by remember { mutableStateOf<Int?>(null) }
   var updateTransactionId by remember { mutableStateOf<Int?>(null) }
   var settlementTransactionId by remember { mutableStateOf<Int?>(null) }
   var channelBalance by remember { mutableStateOf(ZERO to ZERO) }
@@ -136,11 +138,15 @@ fun FundChannel() {
       Text(it)
       Br()
     }
+    updateTxStatus.takeUnless { it.isEmpty() }?.let{
+      Text(it)
+      Br()
+    }
     settlementTxStatus.takeUnless { it.isEmpty() }?.let{
       Text(it)
       Br()
     }
-    updateTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
+    triggerTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
       ChannelView(
         multisigScriptAddress.isNotEmpty(),
         timeLock,
@@ -160,6 +166,12 @@ fun FundChannel() {
         {
           post(settle)
           settlementTxStatus += " and posted!"
+        },
+        updateTransactionId?.let {
+          {
+            post(it)
+            updateTxStatus += " Posted!"
+          }
         }
       )
     }}
@@ -208,15 +220,17 @@ fun FundChannel() {
               console.log("tx msg", msg)
               val splits = msg.split(";")
               if (splits[0].startsWith("TXN_UPDATE")) {
-                val (updateTxId, settleTx) = channelUpdate(splits[0].endsWith("_ACK"), splits[1], splits[2], myUpdateKey, mySettleKey, channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey))
+                val (updateTxId, settleTxPair) = channelUpdate(splits[0].endsWith("_ACK"), splits[1], splits[2], myUpdateKey, mySettleKey, channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey))
                 updateTransactionId = updateTxId
-                settlementTransaction = settleTx
-                val outputs = settleTx["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
+                updateTxStatus += "Update transaction ${if (splits[0].endsWith("ACK")) "ack " else ""}received. "
+                settlementTransactionId = settleTxPair.first
+                settlementTransaction = settleTxPair.second
+                val outputs = settleTxPair.second["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
                 channelBalance = outputs.find { it.miniaddress == myAddress }!!.amount to outputs.find { it.miniaddress == counterPartyAddress }!!.amount
               } else {
                 val (address, triggerTx, settlementTx) = splits
                 counterPartyAddress = address
-                updateTransactionId = newTxId().also {
+                triggerTransactionId = newTxId().also {
                   importTx(it, triggerTx)
                 }
                 triggerTxStatus += ", received back"

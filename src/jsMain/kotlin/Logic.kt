@@ -7,11 +7,14 @@ import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 import minima.*
-import ui.eltooScriptAddress
-import ui.eltooScriptCoins
-import ui.multisigScriptAddress
-import ui.multisigScriptBalances
+import ui.*
 import kotlin.random.Random
+
+data class ChannelState(
+  val id: Int,
+  val sequenceNumber: Int = 0,
+  val status: String,
+)
 
 fun triggerScript(triggerSig1: String, triggerSig2: String) =
   "RETURN MULTISIG(2 $triggerSig1 $triggerSig2)"
@@ -41,6 +44,7 @@ fun init() {
         if (MDS.logging) console.log("Connected to Minima.")
         scope.launch {
           balances.addAll(getBalances())
+          createDB()
         }
       }
       "NEWBLOCK" -> {
@@ -119,17 +123,6 @@ suspend fun signAndExportTx(id: Int, key: String): String {
   return exportTx(id)
 }
 
-suspend fun signAndPost(txnId: Int, key: String): Boolean {
-  val txncreator = "txnsign id:$txnId publickey:$key;" +
-//    "txnbasics id:$txnId;" +
-    "txnpost id:$txnId auto:true;" +
-    "txndelete id:$txnId;"
-  val result = MDS.cmd(txncreator) as Array<dynamic>
-  val txnpost = result.find{it.command == "txnpost"}
-  console.log("txnpost status", txnpost.status)
-  return txnpost.status as Boolean
-}
-
 suspend fun signFloatingTx(myKey: String, sourceScriptAddress: String, targetAddress: String, tx: dynamic, states: Map<Int, String> = emptyMap()): Pair<Int, dynamic> {
   val output = (tx.transaction.outputs as Array<dynamic>).find { it.address == sourceScriptAddress }
   
@@ -186,7 +179,7 @@ suspend fun sendViaChannel(
     "txnexport id:$settleTxnId;"
   val settleTxn = (MDS.cmd(settletxncreator) as Array<dynamic>).last()
   
-  store(channelKey, listOf(if(amount > ZERO) "TXN_UPDATE" else "TXN_REQUEST", updateTxn.response.data, settleTxn.response.data).joinToString(";"))
+  publish(channelKey, listOf(if(amount > ZERO) "TXN_UPDATE" else "TXN_REQUEST", updateTxn.response.data, settleTxn.response.data).joinToString(";"))
 }
 
 suspend fun channelUpdate(isAck: Boolean, updateTx: String, settleTx: String, myUpdateKey: String, mySettleKey: String, channelKey: String): Pair<Int, Pair<Int, JsonObject>> {
@@ -199,8 +192,57 @@ suspend fun channelUpdate(isAck: Boolean, updateTx: String, settleTx: String, my
   if (!isAck) {
     val signedUpdateTx = signAndExportTx(updateTxnId, myUpdateKey)
     val signedSettleTx = signAndExportTx(settleTxnId, mySettleKey)
-    store(channelKey, listOf("TXN_UPDATE_ACK", signedUpdateTx, signedSettleTx).joinToString(";"))
+    publish(channelKey, listOf("TXN_UPDATE_ACK", signedUpdateTx, signedSettleTx).joinToString(";"))
   }
   
   return updateTxnId to (settleTxnId to json.decodeFromJsonElement(importedSettleTx))
+}
+
+suspend fun prepareFundChannel(
+  otherTriggerKey: String,
+  otherUpdateKey: String,
+  otherSettleKey: String,
+  timeLock: Int,
+  myTriggerKey: String,
+  myUpdateKey: String,
+  mySettleKey: String,
+  exportedTriggerTx: String,
+  exportedSettlementTx: String,
+  amount: BigDecimal
+): Int {
+  MDS.sql("""INSERT INTO channel(
+      status, sequence_number, my_balance, other_balance,
+      my_trigger_key, my_update_key, my_settle_key,
+      other_trigger_key, other_update_key, other_settle_key,
+      trigger_tx, settle_tx
+    ) VALUES (
+      'OFFERED', 0, ${amount.toPlainString()}, 0,
+      '$myTriggerKey', '$myUpdateKey', '$mySettleKey',
+      '$otherTriggerKey', '$otherUpdateKey', '$otherSettleKey',
+      '$exportedTriggerTx', '$exportedSettlementTx'
+    );
+  """)
+  val sql = MDS.sql("SELECT IDENTITY() as ID;")
+  val results = sql.rows as Array<dynamic>
+
+  publish(
+    channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey),
+    listOf(timeLock, myTriggerKey, myUpdateKey, mySettleKey, exportedTriggerTx, exportedSettlementTx).joinToString(";")
+  )
+  return (results[0]["ID"] as String).toInt()
+}
+
+suspend fun commitFundChannel(channelId: Int, txnId: Int, key: String): Boolean {
+  val txncreator = "txnsign id:$txnId publickey:$key;" +
+    "txnpost id:$txnId auto:true;" +
+    "txndelete id:$txnId;"
+  val result = MDS.cmd(txncreator) as Array<dynamic>
+  val status = result.find{it.command == "txnpost"}.status
+  console.log("txnpost status", status)
+  if (status == true) {
+    MDS.sql("""UPDATE channel SET
+      updated_at = NOW(), status = 'OPEN'
+      WHERE id = $channelId;""")
+  }
+  return status as Boolean
 }

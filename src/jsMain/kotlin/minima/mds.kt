@@ -138,6 +138,12 @@ object MDS {
     httpPostAsync("${mainhost}sql?uid=$minidappuid", command, callback)
   }
   
+  suspend fun sql(miniFunc: String) = suspendCoroutine<dynamic> { cont ->
+    sql(miniFunc) { response ->
+      cont.resumeWith(Result.success(response))
+    }
+  }
+  
   /**
    * Form GET / POST parameters..
    */

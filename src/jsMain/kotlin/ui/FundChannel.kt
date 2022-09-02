@@ -3,6 +3,7 @@ package ui
 import androidx.compose.runtime.*
 import channelUpdate
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
+import commitFundChannel
 import eltooScript
 import externals.QrScanner
 import fundingTx
@@ -20,10 +21,9 @@ import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLVideoElement
+import prepareFundChannel
 import scope
-import signAndPost
 import signFloatingTx
-import store
 import subscribe
 import triggerScript
 
@@ -208,10 +208,8 @@ fun FundChannel() {
             settlementTxStatus = "Settlement transaction created, signed"
             val exportedTriggerTx = exportTx(triggerTxId)
             val exportedSettlementTx = exportTx(settlementTxId)
-            store(
-              channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey),
-              listOf(timeLock, myTriggerKey, myUpdateKey, mySettleKey, exportedTriggerTx, exportedSettlementTx).joinToString(";")
-            )
+            val channelId = prepareFundChannel(otherTriggerKey, otherUpdateKey, otherSettleKey, timeLock, myTriggerKey, myUpdateKey, mySettleKey, exportedTriggerTx, exportedSettlementTx, amount)
+            console.log("channelId", channelId)
             triggerTxStatus += ", sent"
             settlementTxStatus += ", sent"
   
@@ -238,7 +236,7 @@ fun FundChannel() {
                   settlementTransaction = importTx(it, settlementTx)
                 }
                 settlementTxStatus += ", received back"
-                signAndPost(fundingTxId, "auto")
+                commitFundChannel(channelId, fundingTxId, "auto")
                 fundingTxStatus += " and posted!"
               }
             }.onCompletion {

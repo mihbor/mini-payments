@@ -4,6 +4,7 @@ import dev.gitlive.firebase.firestore.firestore
 import dev.gitlive.firebase.initialize
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.mapNotNull
+import minima.MDS
 
 val firebaseApp = Firebase.initialize(options= FirebaseOptions(
   apiKey= "AIzaSyAxCuQGZTOrHLS-qdaUN2LdEkwHSy3CDpw",
@@ -27,6 +28,41 @@ fun subscribe(id: String): Flow<String> =
         ?.let { data -> data["tx"] }
   }
 
-suspend fun store(id: String, content: String) {
+suspend fun publish(id: String, content: String) {
   Firebase.firestore.collection(COLLECTION).document(id).set(mapOf("tx" to content))
+}
+
+suspend fun createDB() {
+  MDS.sql(///"""DROP TABLE IF EXISTS channel;
+    """CREATE TABLE IF NOT EXISTS channel(
+    id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+    created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    status VARCHAR,
+    my_balance DECIMAL(20,10),
+    other_balance DECIMAL(20,10),
+    my_trigger_key VARCHAR,
+    my_update_key VARCHAR,
+    my_settle_key VARCHAR,
+    other_trigger_key VARCHAR,
+    other_update_key VARCHAR,
+    other_settle_key VARCHAR,
+    sequence_number INT,
+    trigger_tx VARCHAR,
+    update_tx VARCHAR,
+    settle_tx VARCHAR
+  );""".trimMargin())
+}
+
+suspend fun getChannels(): List<ChannelState> {
+  val sql = MDS.sql("SELECT id, status, sequence_number FROM channel;")
+  val rows = sql.rows as Array<dynamic>
+  
+  return rows.map { row ->
+    ChannelState(
+      id = (row.ID as String).toInt(),
+      sequenceNumber = (row.SEQUENCE_NUMBER as String).toInt(),
+      status = row.STATUS as String,
+    )
+  }
 }

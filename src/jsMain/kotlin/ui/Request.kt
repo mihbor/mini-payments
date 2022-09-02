@@ -19,7 +19,6 @@ import org.w3c.dom.HTMLCanvasElement
 import require
 import scope
 
-
 val QRCode = require("qrcode")
 
 fun drawQR(address: String, tokenId:String, amount:String = "") {
@@ -39,7 +38,7 @@ fun clearQR() {
 fun Receive() {
   var showReceive by remember { mutableStateOf(false) }
   var myAddress by remember { mutableStateOf("") }
-  var tokenId by remember { mutableStateOf("") }
+  var tokenId by remember { mutableStateOf("0x00") }
   var amount by remember { mutableStateOf(BigDecimal.ZERO) }
   
   Button({

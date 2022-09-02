@@ -4,10 +4,7 @@ import org.jetbrains.compose.web.dom.A
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Text
 import org.jetbrains.compose.web.renderComposableInBody
-import ui.FundChannel
-import ui.JoinChannel
-import ui.Receive
-import ui.Send
+import ui.*
 
 val scope = MainScope()
 external fun require(module: String): dynamic
@@ -28,6 +25,8 @@ fun main() {
     Br()
     FundChannel()
     Br()
-    JoinChannel()
+    RequestChannel()
+    Br()
+    ChannelListing()
   }
 }

@@ -14,6 +14,8 @@ data class ChannelState(
   val id: Int,
   val sequenceNumber: Int = 0,
   val status: String,
+  val myBalance: BigDecimal,
+  val otherBalance: BigDecimal
 )
 
 fun triggerScript(triggerSig1: String, triggerSig2: String) =
@@ -51,8 +53,10 @@ fun init() {
         blockNumber = (msg.data.txpow.header.block as String).toInt()
         if (multisigScriptAddress.isNotEmpty()) {
           scope.launch {
+            val newBalances = getBalances(multisigScriptAddress)
+            if (newBalances.isNotEmpty() && multisigScriptBalances.isEmpty()) setChannelOpen(multisigScriptAddress)
             multisigScriptBalances.clear()
-            multisigScriptBalances.addAll(getBalances(multisigScriptAddress))
+            multisigScriptBalances.addAll(newBalances)
           }
         }
         if (eltooScriptAddress.isNotEmpty()) {
@@ -199,27 +203,28 @@ suspend fun channelUpdate(isAck: Boolean, updateTx: String, settleTx: String, my
 }
 
 suspend fun prepareFundChannel(
-  otherTriggerKey: String,
-  otherUpdateKey: String,
-  otherSettleKey: String,
-  timeLock: Int,
   myTriggerKey: String,
   myUpdateKey: String,
   mySettleKey: String,
-  exportedTriggerTx: String,
-  exportedSettlementTx: String,
-  amount: BigDecimal
+  otherTriggerKey: String,
+  otherUpdateKey: String,
+  otherSettleKey: String,
+  triggerTx: String,
+  settlementTx: String,
+  amount: BigDecimal,
+  timeLock: Int,
+  multisigAddress: String
 ): Int {
   MDS.sql("""INSERT INTO channel(
       status, sequence_number, my_balance, other_balance,
       my_trigger_key, my_update_key, my_settle_key,
       other_trigger_key, other_update_key, other_settle_key,
-      trigger_tx, settle_tx
+      trigger_tx, settle_tx, time_lock, multisig_address
     ) VALUES (
       'OFFERED', 0, ${amount.toPlainString()}, 0,
       '$myTriggerKey', '$myUpdateKey', '$mySettleKey',
       '$otherTriggerKey', '$otherUpdateKey', '$otherSettleKey',
-      '$exportedTriggerTx', '$exportedSettlementTx'
+      '$triggerTx', '$settlementTx', $timeLock, '$multisigAddress'
     );
   """)
   val sql = MDS.sql("SELECT IDENTITY() as ID;")
@@ -227,7 +232,7 @@ suspend fun prepareFundChannel(
 
   publish(
     channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey),
-    listOf(timeLock, myTriggerKey, myUpdateKey, mySettleKey, exportedTriggerTx, exportedSettlementTx).joinToString(";")
+    listOf(timeLock, myTriggerKey, myUpdateKey, mySettleKey, triggerTx, settlementTx).joinToString(";")
   )
   return (results[0]["ID"] as String).toInt()
 }
@@ -239,10 +244,59 @@ suspend fun commitFundChannel(channelId: Int, txnId: Int, key: String): Boolean 
   val result = MDS.cmd(txncreator) as Array<dynamic>
   val status = result.find{it.command == "txnpost"}.status
   console.log("txnpost status", status)
-  if (status == true) {
-    MDS.sql("""UPDATE channel SET
-      updated_at = NOW(), status = 'OPEN'
-      WHERE id = $channelId;""")
-  }
   return status as Boolean
+}
+
+suspend fun setChannelOpen(multisigAddress: String) {
+  
+  MDS.sql("""UPDATE channel SET
+      updated_at = NOW(),
+      status = 'OPEN'
+      WHERE multisig_address = '$multisigAddress'
+      AND status = 'OFFERED';""")
+}
+
+suspend fun joinChannel(
+  myTriggerKey: String,
+  myUpdateKey: String,
+  mySettleKey: String,
+  otherTriggerKey: String,
+  otherUpdateKey: String,
+  otherSettleKey: String,
+  myAddress: String,
+  triggerTx: String,
+  settlementTx: String,
+  amount: BigDecimal,
+  timeLock: Int,
+  multisigAddress: String
+): Int {
+  MDS.sql("""INSERT INTO channel(
+      status, sequence_number, my_balance, other_balance,
+      my_trigger_key, my_update_key, my_settle_key,
+      other_trigger_key, other_update_key, other_settle_key,
+      trigger_tx, settle_tx, time_lock, multisig_address
+    ) VALUES (
+      'OFFERED', 0, 0, ${amount.toPlainString()},
+      '$myTriggerKey', '$myUpdateKey', '$mySettleKey',
+      '$otherTriggerKey', '$otherUpdateKey', '$otherSettleKey',
+      '$triggerTx', '$settlementTx', $timeLock, '$multisigAddress'
+    );
+  """)
+  val sql = MDS.sql("SELECT IDENTITY() as ID;")
+  val results = sql.rows as Array<dynamic>
+  
+  publish(
+    channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey),
+    listOf(myAddress, triggerTx, settlementTx).joinToString(";")
+  )
+  return (results[0]["ID"] as String).toInt()
+}
+
+suspend fun updateChannelBalance(channelId: Int, channelBalance: Pair<BigDecimal, BigDecimal>) {
+  MDS.sql("""UPDATE channel SET
+     my_balance = ${channelBalance.first.toPlainString()},
+     other_balance = ${channelBalance.second.toPlainString()},
+     updated_at = NOW()
+     WHERE id = $channelId;
+   """)
 }

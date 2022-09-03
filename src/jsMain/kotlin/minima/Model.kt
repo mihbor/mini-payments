@@ -1,8 +1,9 @@
+@file:UseContextualSerialization(BigDecimal::class)
 package minima
 
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
-import kotlinx.serialization.Contextual
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.UseContextualSerialization
 
 data class Balance(
   val tokenid: String,
@@ -24,9 +25,7 @@ data class TokenDescriptor(
 @Serializable
 data class Coin(
   val address: String,
-  @Contextual
   val amount: BigDecimal,
-  @Contextual
   val tokenamount: BigDecimal? = amount,
   val coinid: String,
   val storestate: Boolean,

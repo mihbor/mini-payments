@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import channelUpdate
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import eltooScript
+import joinChannel
 import kotlinx.browser.document
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
@@ -14,17 +15,19 @@ import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
 import minima.*
 import newTxId
-import org.jetbrains.compose.web.css.*
+import org.jetbrains.compose.web.css.DisplayStyle
+import org.jetbrains.compose.web.css.LineStyle
+import org.jetbrains.compose.web.css.border
+import org.jetbrains.compose.web.css.display
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Text
-import org.jetbrains.compose.web.dom.Video
 import org.w3c.dom.HTMLCanvasElement
-import publish
 import scope
 import signAndExportTx
 import subscribe
 import triggerScript
+import updateChannelBalance
 
 @Composable
 fun RequestChannel() {
@@ -57,6 +60,7 @@ fun RequestChannel() {
         mySettleKey = newKey()
         triggerTxStatus = ""
         settlementTxStatus= ""
+        var channelId: Int? = null
         QRCode.toCanvas(canvas, "$myTriggerKey;$myUpdateKey;$mySettleKey", { error ->
           if (error != null) console.error(error)
           else {
@@ -72,6 +76,7 @@ fun RequestChannel() {
                 settlementTransaction = settleTxPair.second
                 val outputs = settleTxPair.second["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
                 channelBalance = outputs.find { it.miniaddress == myAddress }!!.amount to outputs.find { it.miniaddress == counterPartyAddress }!!.amount
+                updateChannelBalance(channelId!!, channelBalance)
               } else {
                 timeLock = splits[0].toInt()
                 otherTriggerKey = splits[1]
@@ -79,8 +84,11 @@ fun RequestChannel() {
                 otherSettleKey = splits[3]
                 val triggerTx = splits[4]
                 val settlementTx = splits[5]
+                multisigScriptAddress = deployScript(triggerScript(otherTriggerKey, myTriggerKey))
+                eltooScriptAddress = deployScript(eltooScript(timeLock, otherUpdateKey, myUpdateKey, otherSettleKey, mySettleKey))
                 triggerTransactionId = newTxId().also { triggerTxId ->
-                  importTx(triggerTxId, triggerTx)
+                  val outputs = importTx(triggerTxId, triggerTx)["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
+                  val amount = outputs.find { it.address == eltooScriptAddress }!!.amount
                   val signedTriggerTx = signAndExportTx(triggerTxId, myTriggerKey)
                   triggerTxStatus = "Trigger transaction receved, signed"
                   settlementTransactionId = newTxId().also { settlementTxId ->
@@ -92,13 +100,11 @@ fun RequestChannel() {
                     val signedSettlementTx = signAndExportTx(settlementTxId, mySettleKey)
                     settlementTransactionId = settlementTxId
                     settlementTxStatus = "Settlement transaction receved, signed"
-                    multisigScriptAddress = deployScript(triggerScript(otherTriggerKey, myTriggerKey))
-                    eltooScriptAddress = deployScript(eltooScript(timeLock, otherUpdateKey, myUpdateKey, otherSettleKey, mySettleKey))
                     myAddress = getAddress()
-                    publish(
-                      channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey),
-                      listOf(myAddress, signedTriggerTx, signedSettlementTx).joinToString(";")
-                    )
+                    channelId = joinChannel(
+                      myTriggerKey, myUpdateKey, mySettleKey,
+                      otherTriggerKey, otherUpdateKey, otherSettleKey,
+                      myAddress, signedTriggerTx, signedSettlementTx, amount, timeLock, multisigScriptAddress)
                     triggerTxStatus += ", sent back"
                     settlementTxStatus += ", sent back"
                   }
@@ -119,12 +125,14 @@ fun RequestChannel() {
   }
   if (showJoinChannel) {
     Br()
-    Text("Trigger key: $myTriggerKey")
-    Br()
-    Text("Update key: $myUpdateKey")
-    Br()
-    Text("Settlement key: $mySettleKey")
-    Br()
+    if(triggerTxStatus.isEmpty()) {
+      Text("Trigger key: $myTriggerKey")
+      Br()
+      Text("Update key: $myUpdateKey")
+      Br()
+      Text("Settlement key: $mySettleKey")
+      Br()
+    }
     triggerTxStatus.takeUnless { it.isEmpty() }?.let{
       Text(it)
       Br()
@@ -171,20 +179,11 @@ fun RequestChannel() {
   Canvas({
     id("joinChannelQR")
     style {
-      if (!showJoinChannel) display(DisplayStyle.None)
+      if (!showJoinChannel || triggerTxStatus.isNotEmpty()) display(DisplayStyle.None)
     }
   })
-  if(showJoinChannel) {
+  if(showJoinChannel && triggerTxStatus.isEmpty()) {
     Br()
     Text("Scan QR code on counter party device")
   }
-  Br()
-  Video({
-    id("joinChannelVideo")
-    style {
-      if (!showJoinChannel) display(DisplayStyle.None)
-      width(500.px)
-      height(500.px)
-    }
-  })
 }

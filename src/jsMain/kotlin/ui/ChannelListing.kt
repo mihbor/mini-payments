@@ -35,6 +35,8 @@ fun ChannelListing() {
           Th { Text("ID") }
           Th { Text("Status") }
           Th { Text("Sequence number") }
+          Th { Text("My balance") }
+          Th { Text("Their balance") }
         }
       }
       Tbody {
@@ -43,6 +45,8 @@ fun ChannelListing() {
             Td { Text(channel.id.toString()) }
             Td { Text(channel.status) }
             Td { Text(channel.sequenceNumber.toString()) }
+            Td { Text(channel.myBalance.toPlainString()) }
+            Td { Text(channel.otherBalance.toPlainString()) }
           }
         }
       }

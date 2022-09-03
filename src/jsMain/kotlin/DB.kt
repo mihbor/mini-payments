@@ -1,3 +1,4 @@
+import com.ionspin.kotlin.bignum.decimal.toBigDecimal
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.FirebaseOptions
 import dev.gitlive.firebase.firestore.firestore
@@ -33,8 +34,8 @@ suspend fun publish(id: String, content: String) {
 }
 
 suspend fun createDB() {
-  MDS.sql(///"""DROP TABLE IF EXISTS channel;
-    """CREATE TABLE IF NOT EXISTS channel(
+  MDS.sql("""DROP TABLE IF EXISTS channel;
+    CREATE TABLE IF NOT EXISTS channel(
     id INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -48,14 +49,16 @@ suspend fun createDB() {
     other_update_key VARCHAR,
     other_settle_key VARCHAR,
     sequence_number INT,
+    time_lock INT,
     trigger_tx VARCHAR,
     update_tx VARCHAR,
-    settle_tx VARCHAR
+    settle_tx VARCHAR,
+    multisig_address VARCHAR
   );""".trimMargin())
 }
 
 suspend fun getChannels(): List<ChannelState> {
-  val sql = MDS.sql("SELECT id, status, sequence_number FROM channel;")
+  val sql = MDS.sql("SELECT id, status, sequence_number, my_balance, other_balance FROM channel;")
   val rows = sql.rows as Array<dynamic>
   
   return rows.map { row ->
@@ -63,6 +66,8 @@ suspend fun getChannels(): List<ChannelState> {
       id = (row.ID as String).toInt(),
       sequenceNumber = (row.SEQUENCE_NUMBER as String).toInt(),
       status = row.STATUS as String,
+      myBalance = (row.MY_BALANCE as String).toBigDecimal(),
+      otherBalance = (row.OTHER_BALANCE as String).toBigDecimal()
     )
   }
 }

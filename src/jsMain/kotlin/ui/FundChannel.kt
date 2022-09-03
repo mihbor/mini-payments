@@ -26,6 +26,7 @@ import scope
 import signFloatingTx
 import subscribe
 import triggerScript
+import updateChannelBalance
 
 var multisigScriptAddress by mutableStateOf("")
 var eltooScriptAddress by mutableStateOf("")
@@ -94,42 +95,44 @@ fun FundChannel() {
   }
   if (showFundChannel) {
     Br()
-    Text("My trigger key: $myTriggerKey")
-    Br()
-    Text("My update key: $myUpdateKey")
-    Br()
-    Text("My settlement key: $mySettleKey")
-    Br()
-    Text("Counterparty trigger key:")
-    TextInput(otherTriggerKey) {
-      onInput {
-        otherTriggerKey = it.value
+    if(fundingTxStatus.isEmpty()) {
+      Text("My trigger key: $myTriggerKey")
+      Br()
+      Text("My update key: $myUpdateKey")
+      Br()
+      Text("My settlement key: $mySettleKey")
+      Br()
+      Text("Counterparty trigger key:")
+      TextInput(otherTriggerKey) {
+        onInput {
+          otherTriggerKey = it.value
+        }
+        style {
+          width(400.px)
+        }
       }
-      style {
-        width(400.px)
+      Br()
+      Text("Counterparty update key:")
+      TextInput(otherUpdateKey) {
+        onInput {
+          otherUpdateKey = it.value
+        }
+        style {
+          width(400.px)
+        }
       }
+      Br()
+      Text("Counterparty settlement key:")
+      TextInput(otherSettleKey) {
+        onInput {
+          otherSettleKey = it.value
+        }
+        style {
+          width(400.px)
+        }
+      }
+      Br()
     }
-    Br()
-    Text("Counterparty update key:")
-    TextInput(otherUpdateKey) {
-      onInput {
-        otherUpdateKey = it.value
-      }
-      style {
-        width(400.px)
-      }
-    }
-    Br()
-    Text("Counterparty settlement key:")
-    TextInput(otherSettleKey) {
-      onInput {
-        otherSettleKey = it.value
-      }
-      style {
-        width(400.px)
-      }
-    }
-    Br()
     fundingTxStatus.takeUnless { it.isEmpty() }?.let{
       Text(it)
       Br()
@@ -175,22 +178,22 @@ fun FundChannel() {
         }
       )
     }}
-    if (listOf(myTriggerKey, mySettleKey, myUpdateKey, otherTriggerKey, otherSettleKey, otherUpdateKey).all(String::isNotEmpty)) {
-      DecimalNumberInput(amount, min = ZERO, disabled = fundingTxStatus.isNotEmpty()) {
+    if (listOf(myTriggerKey, mySettleKey, myUpdateKey, otherTriggerKey, otherSettleKey, otherUpdateKey).all(String::isNotEmpty)
+      && fundingTxStatus.isEmpty()) {
+      DecimalNumberInput(amount, min = ZERO) {
         it?.let { amount = it }
       }
-      TokenSelect(tokenId, fundingTxStatus.isNotEmpty()) {
+      TokenSelect(tokenId) {
         tokenId = it
       }
       Text("Update only time lock (block diff)")
       NumberInput(timeLock, min = 0) {
-        if (fundingTxStatus.isNotEmpty()) disabled()
         onInput {
           timeLock = it.value!!.toInt()
         }
       }
       Button({
-        if(amount <= 0 || fundingTxStatus.isNotEmpty()) disabled()
+        if(amount <= 0) disabled()
         onClick {
           showFundScanner = false
           qrScanner?.stop()
@@ -208,7 +211,11 @@ fun FundChannel() {
             settlementTxStatus = "Settlement transaction created, signed"
             val exportedTriggerTx = exportTx(triggerTxId)
             val exportedSettlementTx = exportTx(settlementTxId)
-            val channelId = prepareFundChannel(otherTriggerKey, otherUpdateKey, otherSettleKey, timeLock, myTriggerKey, myUpdateKey, mySettleKey, exportedTriggerTx, exportedSettlementTx, amount)
+            val channelId = prepareFundChannel(
+              myTriggerKey, myUpdateKey, mySettleKey,
+              otherTriggerKey, otherUpdateKey, otherSettleKey,
+              exportedTriggerTx, exportedSettlementTx, amount, timeLock, multisigScriptAddress
+            )
             console.log("channelId", channelId)
             triggerTxStatus += ", sent"
             settlementTxStatus += ", sent"
@@ -225,6 +232,7 @@ fun FundChannel() {
                 settlementTransaction = settleTxPair.second
                 val outputs = settleTxPair.second["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
                 channelBalance = outputs.find { it.miniaddress == myAddress }!!.amount to outputs.find { it.miniaddress == counterPartyAddress }!!.amount
+                updateChannelBalance(channelId, channelBalance)
               } else {
                 val (address, triggerTx, settlementTx) = splits
                 counterPartyAddress = address

@@ -1,10 +1,13 @@
 package ui
 
+import ChannelState
 import androidx.compose.runtime.*
 import channelUpdate
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import commitFundChannel
 import eltooScript
+import eltooScriptAddress
+import eltooScriptCoins
 import externals.QrScanner
 import fundingTx
 import kotlinx.browser.document
@@ -12,10 +15,12 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
 import minima.*
+import minima.State
+import multisigScriptAddress
+import multisigScriptBalances
 import newTxId
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
@@ -27,11 +32,6 @@ import signFloatingTx
 import subscribe
 import triggerScript
 import updateChannelBalance
-
-var multisigScriptAddress by mutableStateOf("")
-var eltooScriptAddress by mutableStateOf("")
-val multisigScriptBalances = mutableStateListOf<Balance>()
-val eltooScriptCoins = mutableStateListOf<Coin>()
 
 @Composable
 fun FundChannel() {
@@ -51,13 +51,10 @@ fun FundChannel() {
   var triggerTxStatus by remember { mutableStateOf("") }
   var updateTxStatus by remember { mutableStateOf("") }
   var settlementTxStatus by remember { mutableStateOf("") }
-  var triggerTransactionId by remember { mutableStateOf<Int?>(null) }
-  var updateTransactionId by remember { mutableStateOf<Int?>(null) }
-  var settlementTransactionId by remember { mutableStateOf<Int?>(null) }
   var channelBalance by remember { mutableStateOf(ZERO to ZERO) }
-  var settlementTransaction by remember { mutableStateOf<JsonObject?>(null) }
   var myAddress by remember { mutableStateOf("") }
   var counterPartyAddress by remember { mutableStateOf("") }
+  var channel by remember { mutableStateOf<ChannelState?>(null) }
   
   Button({
     onClick {
@@ -149,37 +146,12 @@ fun FundChannel() {
       Text(it)
       Br()
     }
-    triggerTransactionId?.let { trigger -> settlementTransactionId?.let{ settle ->
-      ChannelView(
-        multisigScriptAddress.isNotEmpty(),
-        timeLock,
-        multisigScriptBalances,
-        channelBalance,
-        myAddress,
-        myUpdateKey,
-        mySettleKey,
-        counterPartyAddress,
-        channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey),
-        settlementTransaction!!,
-        eltooScriptCoins,
-        {
-          post(trigger)
-          triggerTxStatus += " and posted!"
-        },
-        {
-          post(settle)
-          settlementTxStatus += " and posted!"
-        },
-        updateTransactionId?.let {
-          {
-            post(it)
-            updateTxStatus += " Posted!"
-          }
-        }
-      )
-    }}
+    channel?.let {
+      ChannelView(it, multisigScriptBalances, eltooScriptCoins[it.eltooAddress] ?: emptyList())
+    }
     if (listOf(myTriggerKey, mySettleKey, myUpdateKey, otherTriggerKey, otherSettleKey, otherUpdateKey).all(String::isNotEmpty)
-      && fundingTxStatus.isEmpty()) {
+      && fundingTxStatus.isEmpty()
+    ) {
       DecimalNumberInput(amount, min = ZERO) {
         it?.let { amount = it }
       }
@@ -211,12 +183,13 @@ fun FundChannel() {
             settlementTxStatus = "Settlement transaction created, signed"
             val exportedTriggerTx = exportTx(triggerTxId)
             val exportedSettlementTx = exportTx(settlementTxId)
-            val channelId = prepareFundChannel(
+            channel = prepareFundChannel(
               myTriggerKey, myUpdateKey, mySettleKey,
               otherTriggerKey, otherUpdateKey, otherSettleKey,
-              exportedTriggerTx, exportedSettlementTx, amount, timeLock, multisigScriptAddress
+              myAddress, multisigScriptAddress, eltooScriptAddress,
+              exportedTriggerTx, exportedSettlementTx, amount, timeLock
             )
-            console.log("channelId", channelId)
+            console.log("channelId", channel!!.id)
             triggerTxStatus += ", sent"
             settlementTxStatus += ", sent"
   
@@ -225,26 +198,22 @@ fun FundChannel() {
               console.log("tx msg", msg)
               val splits = msg.split(";")
               if (splits[0].startsWith("TXN_UPDATE")) {
-                val (updateTxId, settleTxPair) = channelUpdate(splits[0].endsWith("_ACK"), splits[1], splits[2], myUpdateKey, mySettleKey, channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey))
-                updateTransactionId = updateTxId
+                val updateTx = splits[1]
+                val settleTx = splits[2]
+                val settleTxPair = channelUpdate(splits[0].endsWith("_ACK"), updateTx, settleTx, myUpdateKey, mySettleKey, channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey))
                 updateTxStatus += "Update transaction ${if (splits[0].endsWith("ACK")) "ack " else ""}received. "
-                settlementTransactionId = settleTxPair.first
-                settlementTransaction = settleTxPair.second
                 val outputs = settleTxPair.second["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
                 channelBalance = outputs.find { it.miniaddress == myAddress }!!.amount to outputs.find { it.miniaddress == counterPartyAddress }!!.amount
-                updateChannelBalance(channelId, channelBalance)
+                val sequenceNumber = settleTxPair.second["state"]!!.jsonArray.map { json.decodeFromJsonElement<State>(it) }.find { it.port == "99" }?.data?.toInt()
+                channel = updateChannelBalance(channel!!, channelBalance, sequenceNumber!!, updateTx, settleTx)
               } else {
                 val (address, triggerTx, settlementTx) = splits
                 counterPartyAddress = address
-                triggerTransactionId = newTxId().also {
-                  importTx(it, triggerTx)
-                }
+                importTx(newTxId(), triggerTx)
                 triggerTxStatus += ", received back"
-                settlementTransactionId = newTxId().also {
-                  settlementTransaction = importTx(it, settlementTx)
-                }
+                importTx(newTxId(), settlementTx)
                 settlementTxStatus += ", received back"
-                commitFundChannel(channelId, fundingTxId, "auto")
+                channel = commitFundChannel(channel!!, fundingTxId, "auto", counterPartyAddress, settlementTx)
                 fundingTxStatus += " and posted!"
               }
             }.onCompletion {

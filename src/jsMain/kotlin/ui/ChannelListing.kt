@@ -2,8 +2,11 @@ package ui
 
 import ChannelState
 import androidx.compose.runtime.*
+import blockNumber
+import eltooScriptCoins
 import getChannels
 import kotlinx.coroutines.launch
+import minima.getCoins
 import org.jetbrains.compose.web.css.LineStyle
 import org.jetbrains.compose.web.css.border
 import org.jetbrains.compose.web.dom.*
@@ -16,6 +19,14 @@ fun ChannelListing() {
   Button({
     onClick {
       showChannels = !showChannels
+      if (showChannels) scope.launch {
+        val newChannels = getChannels()
+        channels.clear()
+        channels.addAll(newChannels)
+        newChannels.forEach {
+          eltooScriptCoins.put(it.eltooAddress, getCoins(address = it.eltooAddress))
+        }
+      }
     }
     style {
       if (showChannels) border(style = LineStyle.Inset)
@@ -24,11 +35,6 @@ fun ChannelListing() {
     Text("Channel listing")
   }
   if (showChannels) {
-    scope.launch {
-      val newChannels = getChannels()
-      channels.clear()
-      channels.addAll(newChannels)
-    }
     Table {
       Thead {
         Tr {
@@ -37,6 +43,7 @@ fun ChannelListing() {
           Th { Text("Sequence number") }
           Th { Text("My balance") }
           Th { Text("Their balance") }
+          Th { Text("Actions") }
         }
       }
       Tbody {
@@ -46,7 +53,14 @@ fun ChannelListing() {
             Td { Text(channel.status) }
             Td { Text(channel.sequenceNumber.toString()) }
             Td { Text(channel.myBalance.toPlainString()) }
-            Td { Text(channel.otherBalance.toPlainString()) }
+            Td { Text(channel.counterPartyBalance.toPlainString()) }
+            Td {
+              if (channel.status == "OPEN") {
+                ChannelTransfers(channel)
+                Br()
+              }
+              Settlement(channel, blockNumber, eltooScriptCoins[channel.eltooAddress] ?: emptyList())
+            }
           }
         }
       }

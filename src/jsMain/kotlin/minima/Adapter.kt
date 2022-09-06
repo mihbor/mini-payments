@@ -16,6 +16,12 @@ data class Output(
   val miniaddress: String = ""
 )
 
+@Serializable
+data class State(
+  val port: String,
+  val data: String
+)
+
 typealias Input = Output
 
 @OptIn(ExperimentalSerializationApi::class)
@@ -59,7 +65,7 @@ suspend fun deployScript(text: String): String {
   return newscript.response.address
 }
 
-suspend fun getCoins(tokenId: String? = null, address: String? = null, sendable: Boolean): List<Coin> {
+suspend fun getCoins(tokenId: String? = null, address: String? = null, sendable: Boolean = false): List<Coin> {
   val coinSimple = MDS.cmd("coins ${tokenId?.let{"tokenid:$tokenId "} ?:""} ${address?.let{"address:$address "} ?:""}sendable:$sendable")
   val coins = json.decodeFromDynamic<Array<Coin>>(coinSimple.response)
   return coins.sortedBy { it.amount }

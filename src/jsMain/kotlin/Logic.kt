@@ -1,10 +1,15 @@
 import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onCompletion
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 import minima.*
+import minima.State
 import ui.channelKey
+import kotlin.js.Date
 import kotlin.random.Random
 
 data class ChannelState(
@@ -25,7 +30,8 @@ data class ChannelState(
   val updateTx: String = "",
   val settlementTx: String,
   val timeLock: Int,
-  val eltooAddress: String
+  val eltooAddress: String,
+  val updatedAt: Long
 )
 
 fun triggerScript(triggerSig1: String, triggerSig2: String) =
@@ -60,8 +66,20 @@ fun init() {
       "inited" -> {
         if (MDS.logging) console.log("Connected to Minima.")
         scope.launch {
+          blockNumber = getBlockNumber()
           balances.addAll(getBalances())
           createDB()
+          getChannels(status = "OPEN").forEach {
+            subscribe(channelKey(it.myTriggerKey, it.myUpdateKey, it.mySettleKey), from = it.updatedAt).onEach { msg ->
+              console.log("tx msg", msg)
+              val splits = msg.split(";")
+              if (splits[0].startsWith("TXN_UPDATE")) {
+                it.update(splits[0].endsWith("_ACK"), updateTx = splits[1], settleTx = splits[2])
+              }
+            }.onCompletion {
+              console.log("completed")
+            }.launchIn(scope)
+          }
         }
       }
       "NEWBLOCK" -> {
@@ -105,7 +123,6 @@ suspend fun send(toAddress: String, amount: BigDecimal, tokenId: String): Boolea
 }
 
 suspend fun coverShortage(tokenId: String, shortage: BigDecimal, inputs: MutableList<Coin>, outputs: MutableList<Output>) {
-  
   val coins = getCoins(tokenId = tokenId, sendable = true).ofAtLeast(shortage)
   coins.forEach { inputs.add(it) }
   val change = coins.sumOf { it.tokenamount ?: it.amount } - shortage
@@ -174,8 +191,12 @@ suspend fun sendViaChannel(amount: BigDecimal, channel: ChannelState) {
   val settletxncreator = "txncreate id:$settleTxnId;" +
     "txninput id:$settleTxnId address:${input.address} amount:${input.amount} tokenid:${input.tokenid} floating:true;" +
     "txnstate id:$settleTxnId port:99 value:${state.toInt() + 1};" +
-    "txnoutput id:$settleTxnId amount:${(channel.myBalance - amount).toPlainString()} address:${channel.myAddress};" +
-    "txnoutput id:$settleTxnId amount:${(channel.counterPartyBalance + amount).toPlainString()} address:${channel.counterPartyAddress};" +
+    (if(channel.myBalance - amount > ZERO)
+      "txnoutput id:$settleTxnId amount:${(channel.myBalance - amount).toPlainString()} address:${channel.myAddress};"
+      else "") +
+    (if(channel.counterPartyBalance + amount > ZERO)
+      "txnoutput id:$settleTxnId amount:${(channel.counterPartyBalance + amount).toPlainString()} address:${channel.counterPartyAddress};"
+      else "") +
     "txnsign id:$settleTxnId publickey:${channel.mySettleKey};" +
     "txnexport id:$settleTxnId;"
   val settleTxn = (MDS.cmd(settletxncreator) as Array<dynamic>).last()
@@ -186,7 +207,7 @@ suspend fun sendViaChannel(amount: BigDecimal, channel: ChannelState) {
   )
 }
 
-suspend fun channelUpdate(isAck: Boolean, updateTx: String, settleTx: String, myUpdateKey: String, mySettleKey: String, channelKey: String): Pair<Int, JsonObject> {
+suspend fun ChannelState.update(isAck: Boolean, updateTx: String, settleTx: String): ChannelState {
   console.log("Updating channel")
   val updateTxnId = newTxId()
   importTx(updateTxnId, updateTx)
@@ -196,10 +217,13 @@ suspend fun channelUpdate(isAck: Boolean, updateTx: String, settleTx: String, my
   if (!isAck) {
     val signedUpdateTx = signAndExportTx(updateTxnId, myUpdateKey)
     val signedSettleTx = signAndExportTx(settleTxnId, mySettleKey)
-    publish(channelKey, listOf("TXN_UPDATE_ACK", signedUpdateTx, signedSettleTx).joinToString(";"))
+    publish(channelKey(counterPartyTriggerKey, counterPartyUpdateKey, counterPartySettleKey), listOf("TXN_UPDATE_ACK", signedUpdateTx, signedSettleTx).joinToString(";"))
   }
+  val outputs = importedSettleTx["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
+  val channelBalance = outputs.find { it.miniaddress == myAddress }!!.amount to outputs.find { it.miniaddress == counterPartyAddress }!!.amount
+  val sequenceNumber = importedSettleTx["state"]!!.jsonArray.map { json.decodeFromJsonElement<State>(it) }.find { it.port == 99 }?.data?.toInt()
   
-  return settleTxnId to json.decodeFromJsonElement(importedSettleTx)
+  return updateChannel(this, channelBalance, sequenceNumber!!, updateTx, settleTx)
 }
 
 suspend fun prepareFundChannel(
@@ -254,11 +278,19 @@ suspend fun prepareFundChannel(
     triggerTx = triggerTx,
     settlementTx = settlementTx,
     timeLock = timeLock,
-    eltooAddress = eltooAddress
+    eltooAddress = eltooAddress,
+    updatedAt = Date.now().toLong()
   )
 }
 
-suspend fun commitFundChannel(channel: ChannelState, txnId: Int, key: String, counterPartyAddress: String, settlementTx: String): ChannelState {
+suspend fun commitFundChannel(
+  channel: ChannelState,
+  txnId: Int,
+  key: String,
+  counterPartyAddress: String,
+  triggerTx: String,
+  settlementTx: String
+): ChannelState {
   val txncreator = "txnsign id:$txnId publickey:$key;" +
     "txnpost id:$txnId auto:true;" +
     "txndelete id:$txnId;"
@@ -268,22 +300,13 @@ suspend fun commitFundChannel(channel: ChannelState, txnId: Int, key: String, co
   if (status == true) {
     MDS.sql("""UPDATE channel SET
       other_address = '$counterPartyAddress',
+      trigger_tx = '$triggerTx',
       settle_tx = '$settlementTx',
       updated_at = NOW()
       WHERE id = ${channel.id};
     """)
   }
-  return channel.copy(settlementTx = settlementTx, counterPartyAddress = counterPartyAddress)
-}
-
-suspend fun setChannelOpen(multisigAddress: String) {
-  
-  MDS.sql("""UPDATE channel SET
-    updated_at = NOW(),
-    status = 'OPEN'
-    WHERE multisig_address = '$multisigAddress'
-    AND status = 'OFFERED';
-  """)
+  return channel.copy(triggerTx = triggerTx, settlementTx = settlementTx, counterPartyAddress = counterPartyAddress, updatedAt = Date.now().toLong())
 }
 
 suspend fun joinChannel(
@@ -327,9 +350,10 @@ suspend fun joinChannel(
     id = (results[0]["ID"] as String).toInt(),
     sequenceNumber = 0,
     status = "OFFERED",
-    myBalance = amount,
-    counterPartyBalance = ZERO,
+    myBalance = ZERO,
+    counterPartyBalance = amount,
     myAddress = myAddress,
+    counterPartyAddress = otherAddress,
     myTriggerKey = myTriggerKey,
     myUpdateKey = myUpdateKey,
     mySettleKey = mySettleKey,
@@ -339,32 +363,8 @@ suspend fun joinChannel(
     triggerTx = triggerTx,
     settlementTx = settlementTx,
     timeLock = timeLock,
-    eltooAddress = eltooAddress
-  )
-}
-
-suspend fun updateChannelBalance(
-  channel: ChannelState,
-  channelBalance: Pair<BigDecimal, BigDecimal>,
-  sequenceNumber: Int,
-  updateTx: String,
-  settlementTx: String
-): ChannelState {
-  MDS.sql("""UPDATE channel SET
-    my_balance = ${channelBalance.first.toPlainString()},
-    other_balance = ${channelBalance.second.toPlainString()},
-    sequence_number = $sequenceNumber,
-    update_tx = '$updateTx',
-    settle_tx = '$settlementTx',
-    updated_at = NOW()
-    WHERE id = ${channel.id};
-  """)
-  return channel.copy(
-    myBalance = channelBalance.first,
-    counterPartyBalance = channelBalance.second,
-    sequenceNumber = sequenceNumber,
-    updateTx = updateTx,
-    settlementTx = settlementTx
+    eltooAddress = eltooAddress,
+    updatedAt = Date.now().toLong()
   )
 }
 

@@ -19,14 +19,7 @@ fun ChannelListing() {
   Button({
     onClick {
       showChannels = !showChannels
-      if (showChannels) scope.launch {
-        val newChannels = getChannels()
-        channels.clear()
-        channels.addAll(newChannels)
-        newChannels.forEach {
-          eltooScriptCoins.put(it.eltooAddress, getCoins(address = it.eltooAddress))
-        }
-      }
+      if (showChannels) loadChannels(channels)
     }
     style {
       if (showChannels) border(style = LineStyle.Inset)
@@ -35,6 +28,13 @@ fun ChannelListing() {
     Text("Channel listing")
   }
   if (showChannels) {
+    Button({
+      onClick {
+        loadChannels(channels)
+      }
+    }) {
+      Text("Refresh")
+    }
     Table {
       Thead {
         Tr {
@@ -64,6 +64,17 @@ fun ChannelListing() {
           }
         }
       }
+    }
+  }
+}
+
+private fun loadChannels(channels: MutableList<ChannelState>) {
+  scope.launch {
+    val newChannels = getChannels()
+    channels.clear()
+    channels.addAll(newChannels)
+    newChannels.forEach {
+      eltooScriptCoins.put(it.eltooAddress, getCoins(address = it.eltooAddress))
     }
   }
 }

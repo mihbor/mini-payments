@@ -1,11 +1,14 @@
+import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import com.ionspin.kotlin.bignum.decimal.toBigDecimal
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.FirebaseOptions
 import dev.gitlive.firebase.firestore.firestore
 import dev.gitlive.firebase.initialize
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
 import minima.MDS
+import kotlin.js.Date
 
 val firebaseApp = Firebase.initialize(options= FirebaseOptions(
   apiKey= "AIzaSyAxCuQGZTOrHLS-qdaUN2LdEkwHSy3CDpw",
@@ -20,17 +23,20 @@ const val COLLECTION = "transactions"
 
 suspend fun fetch(id: String): String? = (
   Firebase.firestore.collection(COLLECTION).document(id).get()
-    .takeIf { it.exists }?.data() as Map<String, String>?
-  )?.let{ it["tx"] }
+    .takeIf { it.exists }?.get("tx")
+  )
 
-fun subscribe(id: String): Flow<String> =
+fun subscribe(id: String, from: Long? = null): Flow<String> =
   Firebase.firestore.collection(COLLECTION).document(id).snapshots.mapNotNull { doc ->
-      ((if(doc.exists) doc else null)?.data() as Map<String, String>?)
-        ?.let { data -> data["tx"] }
+    if(doc.exists) doc else null
+  }.filter{
+    from == null || from <= (it.get("timestamp") as? Double ?: 0.0)
+  }.mapNotNull {
+    it.get("tx")
   }
 
 suspend fun publish(id: String, content: String) {
-  Firebase.firestore.collection(COLLECTION).document(id).set(mapOf("tx" to content))
+  Firebase.firestore.collection(COLLECTION).document(id).set(mapOf("tx" to content, "timestamp" to Date.now()))
 }
 
 suspend fun createDB() {
@@ -60,13 +66,13 @@ suspend fun createDB() {
   );""".trimMargin())
 }
 
-suspend fun getChannels(): List<ChannelState> {
+suspend fun getChannels(status: String? = null): List<ChannelState> {
   val sql = MDS.sql("""SELECT
     id, status, sequence_number, my_balance, other_balance,
     my_address, my_trigger_key, my_update_key, my_settle_key,
     other_address, other_trigger_key, other_update_key, other_settle_key,
-    trigger_tx, COALESCE(update_tx, '') AS update_tx, settle_tx, time_lock, eltoo_address
-    FROM channel;
+    trigger_tx, update_tx, settle_tx, time_lock, eltoo_address, updated_at
+    FROM channel${status?.let { " WHERE status = '$it'" } ?: ""};
   """)
   val rows = sql.rows as Array<dynamic>
   
@@ -89,7 +95,8 @@ suspend fun getChannels(): List<ChannelState> {
       updateTx = row.UPDATE_TX as String,
       settlementTx = row.SETTLE_TX as String,
       timeLock = (row.TIME_LOCK as String).toInt(),
-      eltooAddress = row.ELTOO_ADDRESS as String
+      eltooAddress = row.ELTOO_ADDRESS as String,
+      updatedAt = Date.parse(row.UPDATED_AT as String).toLong()
     )
   }
 }
@@ -100,4 +107,39 @@ suspend fun updateChannelStatus(channelId: Int, status: String) {
     updated_at = NOW()
     WHERE id = $channelId;
   """)
+}
+
+suspend fun setChannelOpen(multisigAddress: String) {
+  MDS.sql("""UPDATE channel SET
+    updated_at = NOW(),
+    status = 'OPEN'
+    WHERE multisig_address = '$multisigAddress'
+    AND status = 'OFFERED';
+  """)
+}
+
+suspend fun updateChannel(
+  channel: ChannelState,
+  channelBalance: Pair<BigDecimal, BigDecimal>,
+  sequenceNumber: Int,
+  updateTx: String,
+  settlementTx: String
+): ChannelState {
+  MDS.sql("""UPDATE channel SET
+    my_balance = ${channelBalance.first.toPlainString()},
+    other_balance = ${channelBalance.second.toPlainString()},
+    sequence_number = $sequenceNumber,
+    update_tx = '$updateTx',
+    settle_tx = '$settlementTx',
+    updated_at = NOW()
+    WHERE id = ${channel.id};
+  """)
+  return channel.copy(
+    myBalance = channelBalance.first,
+    counterPartyBalance = channelBalance.second,
+    sequenceNumber = sequenceNumber,
+    updateTx = updateTx,
+    settlementTx = settlementTx,
+    updatedAt = Date.now().toLong()
+  )
 }

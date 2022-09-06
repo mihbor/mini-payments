@@ -2,7 +2,7 @@ package ui
 
 import ChannelState
 import androidx.compose.runtime.*
-import channelUpdate
+import update
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import commitFundChannel
 import eltooScript
@@ -15,10 +15,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonArray
 import minima.*
-import minima.State
 import multisigScriptAddress
 import multisigScriptBalances
 import newTxId
@@ -31,7 +28,6 @@ import scope
 import signFloatingTx
 import subscribe
 import triggerScript
-import updateChannelBalance
 
 @Composable
 fun FundChannel() {
@@ -51,7 +47,6 @@ fun FundChannel() {
   var triggerTxStatus by remember { mutableStateOf("") }
   var updateTxStatus by remember { mutableStateOf("") }
   var settlementTxStatus by remember { mutableStateOf("") }
-  var channelBalance by remember { mutableStateOf(ZERO to ZERO) }
   var myAddress by remember { mutableStateOf("") }
   var counterPartyAddress by remember { mutableStateOf("") }
   var channel by remember { mutableStateOf<ChannelState?>(null) }
@@ -78,8 +73,7 @@ fun FundChannel() {
         mySettleKey = newKey()
         fundingTxStatus = ""
         triggerTxStatus = ""
-        settlementTxStatus= ""
-
+        settlementTxStatus = ""
       } else {
         qrScanner?.stop()
       }
@@ -174,7 +168,6 @@ fun FundChannel() {
             eltooScriptAddress = deployScript(eltooScript(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
             console.log("multisig address (fund)", multisigScriptAddress)
             val (fundingTxId, fundingTx) = fundingTx(multisigScriptAddress, amount, tokenId)
-            channelBalance = amount to ZERO
             fundingTxStatus = "Funding transaction created"
             myAddress = getAddress()
             val (triggerTxId, triggerTx) = signFloatingTx(myTriggerKey, multisigScriptAddress, eltooScriptAddress, fundingTx, mapOf(99 to "0"))
@@ -198,14 +191,8 @@ fun FundChannel() {
               console.log("tx msg", msg)
               val splits = msg.split(";")
               if (splits[0].startsWith("TXN_UPDATE")) {
-                val updateTx = splits[1]
-                val settleTx = splits[2]
-                val settleTxPair = channelUpdate(splits[0].endsWith("_ACK"), updateTx, settleTx, myUpdateKey, mySettleKey, channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey))
+                channel = channel!!.update(splits[0].endsWith("_ACK"), updateTx = splits[1], settleTx = splits[2])
                 updateTxStatus += "Update transaction ${if (splits[0].endsWith("ACK")) "ack " else ""}received. "
-                val outputs = settleTxPair.second["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
-                channelBalance = outputs.find { it.miniaddress == myAddress }!!.amount to outputs.find { it.miniaddress == counterPartyAddress }!!.amount
-                val sequenceNumber = settleTxPair.second["state"]!!.jsonArray.map { json.decodeFromJsonElement<State>(it) }.find { it.port == "99" }?.data?.toInt()
-                channel = updateChannelBalance(channel!!, channelBalance, sequenceNumber!!, updateTx, settleTx)
               } else {
                 val (address, triggerTx, settlementTx) = splits
                 counterPartyAddress = address
@@ -213,7 +200,7 @@ fun FundChannel() {
                 triggerTxStatus += ", received back"
                 importTx(newTxId(), settlementTx)
                 settlementTxStatus += ", received back"
-                channel = commitFundChannel(channel!!, fundingTxId, "auto", counterPartyAddress, settlementTx)
+                channel = commitFundChannel(channel!!, fundingTxId, "auto", counterPartyAddress, triggerTx, settlementTx)
                 fundingTxStatus += " and posted!"
               }
             }.onCompletion {

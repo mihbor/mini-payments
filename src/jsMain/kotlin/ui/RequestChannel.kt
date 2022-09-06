@@ -2,8 +2,6 @@ package ui
 
 import ChannelState
 import androidx.compose.runtime.*
-import channelUpdate
-import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import eltooScript
 import eltooScriptAddress
 import eltooScriptCoins
@@ -16,7 +14,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
 import minima.*
-import minima.State
 import multisigScriptAddress
 import multisigScriptBalances
 import newTxId
@@ -32,7 +29,7 @@ import scope
 import signAndExportTx
 import subscribe
 import triggerScript
-import updateChannelBalance
+import update
 
 @Composable
 fun RequestChannel() {
@@ -47,7 +44,6 @@ fun RequestChannel() {
   var updateTxStatus by remember { mutableStateOf("") }
   var settlementTxStatus by remember { mutableStateOf("") }
   var timeLock by remember { mutableStateOf(10) }
-  var channelBalance by remember { mutableStateOf(ZERO to ZERO) }
   var myAddress by remember { mutableStateOf("") }
   var counterPartyAddress by remember { mutableStateOf("") }
   var channel by remember { mutableStateOf<ChannelState?>(null) }
@@ -62,7 +58,8 @@ fun RequestChannel() {
         mySettleKey = newKey()
         triggerTxStatus = ""
         settlementTxStatus= ""
-        QRCode.toCanvas(canvas, "$myTriggerKey;$myUpdateKey;$mySettleKey", { error ->
+        QRCode.toCanvas(canvas, "$myTriggerKey;$myUpdateKey;$mySettleKey"
+        ) { error ->
           if (error != null) console.error(error)
           else {
             console.log("qr generated, subscribing to $myTriggerKey;$myUpdateKey;$mySettleKey")
@@ -70,14 +67,8 @@ fun RequestChannel() {
               console.log("tx msg", msg)
               val splits = msg.split(";")
               if (splits[0].startsWith("TXN_UPDATE")) {
-                val updateTx = splits[1]
-                val settleTx = splits[2]
-                val settleTxPair = channelUpdate(splits[0].endsWith("ACK"), updateTx, settleTx, myUpdateKey, mySettleKey, channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey))
+                channel = channel!!.update(splits[0].endsWith("ACK"), updateTx = splits[1], settleTx = splits[2])
                 updateTxStatus += "Update transaction ${if (splits[0].endsWith("ACK")) "ack " else ""}received. "
-                val outputs = settleTxPair.second["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
-                channelBalance = outputs.find { it.miniaddress == myAddress }!!.amount to outputs.find { it.miniaddress == counterPartyAddress }!!.amount
-                val sequenceNumber = settleTxPair.second["state"]!!.jsonArray.map { json.decodeFromJsonElement<State>(it) }.find { it.port == "99" }?.data?.toInt()
-                channel = updateChannelBalance(channel!!, channelBalance, sequenceNumber!!, updateTx, settleTx)
               } else {
                 timeLock = splits[0].toInt()
                 otherTriggerKey = splits[1]
@@ -95,7 +86,6 @@ fun RequestChannel() {
                   newTxId().also { settlementTxId ->
                     importTx(settlementTxId, settlementTx).also {
                       val output = json.decodeFromJsonElement<Output>(it["outputs"]!!.jsonArray.first())
-                      channelBalance = ZERO to output.amount
                       counterPartyAddress = output.miniaddress
                     }
                     val signedSettlementTx = signAndExportTx(settlementTxId, mySettleKey)
@@ -116,7 +106,7 @@ fun RequestChannel() {
               console.log("completed")
             }.launchIn(scope)
           }
-        })
+        };Unit
       }
     }
     style {

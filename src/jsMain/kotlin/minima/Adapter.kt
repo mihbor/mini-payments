@@ -18,11 +18,16 @@ data class Output(
 
 @Serializable
 data class State(
-  val port: String,
+  val port: Int,
   val data: String
 )
 
 typealias Input = Output
+
+suspend fun getBlockNumber(): Int {
+  val status = MDS.cmd("status")
+  return status.response.chain.block as Int
+}
 
 @OptIn(ExperimentalSerializationApi::class)
 suspend fun getBalances(address: String? = null): List<Balance> {

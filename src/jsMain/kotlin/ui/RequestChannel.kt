@@ -2,6 +2,7 @@ package ui
 
 import ChannelState
 import androidx.compose.runtime.*
+import channelKey
 import eltooScript
 import eltooScriptAddress
 import eltooScriptCoins

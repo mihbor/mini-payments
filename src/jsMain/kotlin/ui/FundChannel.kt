@@ -2,6 +2,7 @@ package ui
 
 import ChannelState
 import androidx.compose.runtime.*
+import channelKey
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import commitFundChannel
 import eltooScript

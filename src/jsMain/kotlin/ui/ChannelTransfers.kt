@@ -42,5 +42,3 @@ fun ChannelTransfers(channel: ChannelState) {
     }
   }
 }
-
-fun channelKey(vararg keys: String) = keys.joinToString(";")

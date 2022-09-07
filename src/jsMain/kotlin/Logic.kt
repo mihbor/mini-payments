@@ -8,7 +8,6 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
 import minima.*
 import minima.State
-import ui.channelKey
 import kotlin.js.Date
 import kotlin.random.Random
 
@@ -184,6 +183,8 @@ suspend fun sendViaChannel(amount: BigDecimal, channel: ChannelState) {
     listOf(if(amount > ZERO) "TXN_UPDATE" else "TXN_REQUEST", updateTxn.response.data, settleTxn.response.data).joinToString(";")
   )
 }
+
+fun channelKey(vararg keys: String) = keys.joinToString(";")
 
 suspend fun ChannelState.update(isAck: Boolean, updateTx: String, settleTx: String): ChannelState {
   console.log("Updating channel")

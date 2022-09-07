@@ -66,7 +66,7 @@ suspend fun newKey(): String {
 }
 
 suspend fun deployScript(text: String): String {
-  val newscript = MDS.cmd("""newscript script:"$text" track:true""")
+  val newscript = MDS.cmd("""newscript script:"$text" trackall:true""")
   return newscript.response.address
 }
 

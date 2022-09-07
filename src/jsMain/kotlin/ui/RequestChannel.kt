@@ -138,7 +138,9 @@ fun RequestChannel() {
       Br()
     }
     channel?.let {
-      ChannelView(it, multisigScriptBalances, eltooScriptCoins[it.eltooAddress] ?: emptyList())
+      ChannelView(it, multisigScriptBalances, eltooScriptCoins[it.eltooAddress] ?: emptyList()) {
+        channel = it
+      }
     }
   }
   Br()

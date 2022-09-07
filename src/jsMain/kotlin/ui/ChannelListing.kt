@@ -47,7 +47,7 @@ fun ChannelListing() {
         }
       }
       Tbody {
-        channels.forEach { channel ->
+        channels.forEachIndexed { index, channel ->
           Tr {
             Td { Text(channel.id.toString()) }
             Td { Text(channel.status) }
@@ -59,7 +59,9 @@ fun ChannelListing() {
                 ChannelTransfers(channel)
                 Br()
               }
-              Settlement(channel, blockNumber, eltooScriptCoins[channel.eltooAddress] ?: emptyList())
+              Settlement(channel, blockNumber, eltooScriptCoins[channel.eltooAddress] ?: emptyList()) {
+                channels[index] = it
+              }
             }
           }
         }

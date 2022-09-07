@@ -2,7 +2,6 @@ package ui
 
 import ChannelState
 import androidx.compose.runtime.*
-import update
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import commitFundChannel
 import eltooScript
@@ -28,6 +27,7 @@ import scope
 import signFloatingTx
 import subscribe
 import triggerScript
+import update
 
 @Composable
 fun FundChannel() {
@@ -141,7 +141,9 @@ fun FundChannel() {
       Br()
     }
     channel?.let {
-      ChannelView(it, multisigScriptBalances, eltooScriptCoins[it.eltooAddress] ?: emptyList())
+      ChannelView(it, multisigScriptBalances, eltooScriptCoins[it.eltooAddress] ?: emptyList()) {
+        channel = it
+      }
     }
     if (listOf(myTriggerKey, mySettleKey, myUpdateKey, otherTriggerKey, otherSettleKey, otherUpdateKey).all(String::isNotEmpty)
       && fundingTxStatus.isEmpty()

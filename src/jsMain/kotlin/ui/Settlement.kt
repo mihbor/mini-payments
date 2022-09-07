@@ -14,18 +14,19 @@ import scope
 import triggerSettlement
 
 @Composable
-fun Settlement(channel: ChannelState, blockNumber: Int, eltooScriptCoins: List<Coin>) {
+fun Settlement(channel: ChannelState, blockNumber: Int, eltooScriptCoins: List<Coin>, updateChannel: (ChannelState) -> Unit) {
 
   var settlementTriggering by remember { mutableStateOf(false) }
   var updatePosting by remember { mutableStateOf(false) }
   var settlementCompleting by remember { mutableStateOf(false) }
+  console.log("Channel status", channel.status)
 
   if (channel.status == "OPEN") {
     Button({
       onClick {
         settlementTriggering = true
         scope.launch {
-          channel.triggerSettlement()
+          updateChannel(channel.triggerSettlement())
           settlementTriggering = false
         }
       }
@@ -47,7 +48,7 @@ fun Settlement(channel: ChannelState, blockNumber: Int, eltooScriptCoins: List<C
         onClick {
           updatePosting = true
           scope.launch {
-            channel.postUpdate()
+            updateChannel(channel.postUpdate())
             updatePosting = false
           }
         }
@@ -62,7 +63,7 @@ fun Settlement(channel: ChannelState, blockNumber: Int, eltooScriptCoins: List<C
         onClick {
           settlementCompleting = true
           scope.launch {
-            channel.completeSettlement()
+            updateChannel(channel.completeSettlement())
             settlementCompleting = false
           }
         }

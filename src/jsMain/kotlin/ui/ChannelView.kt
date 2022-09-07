@@ -14,6 +14,7 @@ fun ChannelView(
   channel: ChannelState,
   multisigScriptBalances: List<Balance>,
   eltooScriptCoins: List<Coin>,
+  updateChannel: (ChannelState) -> Unit
 ) {
   Br()
   multisigScriptBalances.forEach {
@@ -24,6 +25,11 @@ fun ChannelView(
     Text("Channel balance: me ${channel.myBalance.toPlainString()}, counterparty ${channel.counterPartyBalance.toPlainString()}")
     ChannelTransfers(channel)
     Br()
-    Settlement(channel, blockNumber, eltooScriptCoins)
   }
+  Settlement(
+    channel.copy(status = if (multisigScriptBalances.any { it.unconfirmed > ZERO || it.confirmed > ZERO }) "OPEN" else channel.status),
+    blockNumber,
+    eltooScriptCoins,
+    updateChannel
+  )
 }

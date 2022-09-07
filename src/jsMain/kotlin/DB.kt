@@ -101,12 +101,13 @@ suspend fun getChannels(status: String? = null): List<ChannelState> {
   }
 }
 
-suspend fun updateChannelStatus(channelId: Int, status: String) {
+suspend fun updateChannelStatus(channel: ChannelState, status: String): ChannelState {
   MDS.sql("""UPDATE channel SET
     status = '$status',
     updated_at = NOW()
-    WHERE id = $channelId;
+    WHERE id = ${channel.id};
   """)
+  return channel.copy(status = status, updatedAt = Date.now().toLong())
 }
 
 suspend fun setChannelOpen(multisigAddress: String) {

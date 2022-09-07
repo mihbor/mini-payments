@@ -12,28 +12,6 @@ import ui.channelKey
 import kotlin.js.Date
 import kotlin.random.Random
 
-data class ChannelState(
-  val id: Int,
-  val sequenceNumber: Int = 0,
-  val status: String,
-  val myBalance: BigDecimal,
-  val counterPartyBalance: BigDecimal,
-  val myAddress: String,
-  val myTriggerKey: String,
-  val myUpdateKey: String,
-  val mySettleKey: String,
-  val counterPartyAddress: String = "",
-  val counterPartyTriggerKey: String,
-  val counterPartyUpdateKey: String,
-  val counterPartySettleKey: String,
-  val triggerTx: String,
-  val updateTx: String = "",
-  val settlementTx: String,
-  val timeLock: Int,
-  val eltooAddress: String,
-  val updatedAt: Long
-)
-
 fun triggerScript(triggerSig1: String, triggerSig2: String) =
   "RETURN MULTISIG(2 $triggerSig1 $triggerSig2)"
 
@@ -374,23 +352,20 @@ suspend fun importAndPost(tx: String): dynamic {
   return post(txId)
 }
 
-suspend fun ChannelState.triggerSettlement() {
+suspend fun ChannelState.triggerSettlement(): ChannelState {
   val response = importAndPost(triggerTx)
-  if (response != null) {
-    updateChannelStatus(id, "TRIGGERED")
-  }
+  return if (response == null) this
+    else updateChannelStatus(this, "TRIGGERED")
 }
 
-suspend fun ChannelState.postUpdate() {
+suspend fun ChannelState.postUpdate(): ChannelState {
   val response = importAndPost(updateTx)
-  if (response != null) {
-    updateChannelStatus(id, "UPDATED")
-  }
+  return if (response == null) this
+    else updateChannelStatus(this, "UPDATED")
 }
 
-suspend fun ChannelState.completeSettlement() {
+suspend fun ChannelState.completeSettlement(): ChannelState {
   val response = importAndPost(settlementTx)
-  if (response != null) {
-    updateChannelStatus(id, "SETTLED")
-  }
+  return if (response == null) this
+    else updateChannelStatus(this, "SETTLED")
 }

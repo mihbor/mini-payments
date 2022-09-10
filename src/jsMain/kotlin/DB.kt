@@ -67,13 +67,7 @@ suspend fun createDB() {
 }
 
 suspend fun getChannels(status: String? = null): List<ChannelState> {
-  val sql = MDS.sql("""SELECT
-    id, status, sequence_number, my_balance, other_balance,
-    my_address, my_trigger_key, my_update_key, my_settle_key,
-    other_address, other_trigger_key, other_update_key, other_settle_key,
-    trigger_tx, update_tx, settle_tx, time_lock, eltoo_address, updated_at
-    FROM channel${status?.let { " WHERE status = '$it'" } ?: ""};
-  """)
+  val sql = MDS.sql("SELECT * FROM channel${status?.let { " WHERE status = '$it'" } ?: ""} ORDER BY id DESC;")
   val rows = sql.rows as Array<dynamic>
   
   return rows.map { row ->

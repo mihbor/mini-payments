@@ -204,7 +204,7 @@ fun FundChannel() {
                 importTx(newTxId(), settlementTx)
                 settlementTxStatus += ", received back"
                 channel = commitFundChannel(channel!!, fundingTxId, "auto", counterPartyAddress, triggerTx, settlementTx)
-                fundingTxStatus += " and posted!"
+                fundingTxStatus += ", signed and posted!"
               }
             }.onCompletion {
               console.log("completed")

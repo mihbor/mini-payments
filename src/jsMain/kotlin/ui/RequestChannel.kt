@@ -83,14 +83,14 @@ fun RequestChannel() {
                   val outputs = importTx(triggerTxId, triggerTx)["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
                   val amount = outputs.find { it.address == eltooScriptAddress }!!.amount
                   val signedTriggerTx = signAndExportTx(triggerTxId, myTriggerKey)
-                  triggerTxStatus = "Trigger transaction receved, signed"
+                  triggerTxStatus = "Trigger transaction received, signed"
                   newTxId().also { settlementTxId ->
                     importTx(settlementTxId, settlementTx).also {
                       val output = json.decodeFromJsonElement<Output>(it["outputs"]!!.jsonArray.first())
                       counterPartyAddress = output.miniaddress
                     }
                     val signedSettlementTx = signAndExportTx(settlementTxId, mySettleKey)
-                    settlementTxStatus = "Settlement transaction receved, signed"
+                    settlementTxStatus = "Settlement transaction received, signed"
                     myAddress = getAddress()
                     channel = joinChannel(
                       myTriggerKey, myUpdateKey, mySettleKey,

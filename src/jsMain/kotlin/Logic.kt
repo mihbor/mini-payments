@@ -64,7 +64,7 @@ fun init() {
         if (multisigScriptAddress.isNotEmpty()) {
           scope.launch {
             val newBalances = getBalances(multisigScriptAddress)
-            if (newBalances.isNotEmpty() && multisigScriptBalances.isEmpty()) setChannelOpen(multisigScriptAddress)
+            if (newBalances.any { it.unconfirmed > ZERO || it.confirmed > ZERO } && multisigScriptBalances.none { it.unconfirmed > ZERO || it.confirmed > ZERO }) setChannelOpen(multisigScriptAddress)
             multisigScriptBalances.clear()
             multisigScriptBalances.addAll(newBalances)
           }
@@ -81,9 +81,7 @@ fun init() {
 
 suspend fun send(toAddress: String, amount: BigDecimal, tokenId: String): Boolean {
   val txnId = newTxId()
-  val inputs = mutableListOf<Coin>()
-  val outputs = mutableListOf<Output>()
-  coverShortage(tokenId, amount, inputs, outputs)
+  val (inputs, outputs) = withChange(tokenId, amount)
   
   val txncreator = "txncreate id:$txnId;" +
     inputs.map{ "txninput id:$txnId coinid:${it.coinid};"}.joinToString("") +
@@ -99,11 +97,14 @@ suspend fun send(toAddress: String, amount: BigDecimal, tokenId: String): Boolea
   return txnpost.status
 }
 
-suspend fun coverShortage(tokenId: String, shortage: BigDecimal, inputs: MutableList<Coin>, outputs: MutableList<Output>) {
-  val coins = getCoins(tokenId = tokenId, sendable = true).ofAtLeast(shortage)
+suspend fun withChange(tokenId: String, amount: BigDecimal): Pair<List<Coin>, List<Output>> {
+  val inputs = mutableListOf<Coin>()
+  val outputs = mutableListOf<Output>()
+  val coins = getCoins(tokenId = tokenId, sendable = true).ofAtLeast(amount)
   coins.forEach { inputs.add(it) }
-  val change = coins.sumOf { it.tokenamount ?: it.amount } - shortage
+  val change = coins.sumOf { it.tokenamount ?: it.amount } - amount
   if (change > ZERO) outputs.add(Output(newAddress(), change, tokenId))
+  return inputs to outputs
 }
 
 fun List<Coin>.ofAtLeast(amount: BigDecimal): List<Coin> {
@@ -116,9 +117,7 @@ fun <T> Iterable<T>.sumOf(selector: (T) -> BigDecimal) = fold(ZERO) { acc, item 
 
 suspend fun fundingTx(toAddress: String, amount: BigDecimal, tokenId: String): Pair<Int, dynamic> {
   val txnId = newTxId()
-  val inputs = mutableListOf<Coin>()
-  val outputs = mutableListOf<Output>()
-  coverShortage(tokenId, amount, inputs, outputs)
+  val (inputs, outputs) = withChange(tokenId, amount)
   
   val txncreator = "txncreate id:$txnId;" +
     inputs.map{ "txninput id:$txnId coinid:${it.coinid};"}.joinToString("") +
@@ -135,7 +134,13 @@ suspend fun signAndExportTx(id: Int, key: String): String {
   return exportTx(id)
 }
 
-suspend fun signFloatingTx(myKey: String, sourceScriptAddress: String, targetAddress: String, tx: dynamic, states: Map<Int, String> = emptyMap()): Pair<Int, dynamic> {
+suspend fun signFloatingTx(
+  myKey: String,
+  sourceScriptAddress: String,
+  targetAddress: String,
+  tx: dynamic,
+  states: Map<Int, String> = emptyMap()
+): Pair<Int, dynamic> {
   val output = (tx.transaction.outputs as Array<dynamic>).find { it.address == sourceScriptAddress }
   
   val txnId = newTxId()

@@ -1,5 +1,5 @@
 
-val firebaseSdkVersion = "1.5.0"
+val firebaseSdkVersion = "1.6.2"
 
 plugins {
   kotlin("multiplatform") version "1.6.10"

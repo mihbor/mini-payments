@@ -2,9 +2,9 @@
 val firebaseSdkVersion = "1.6.2"
 
 plugins {
-  kotlin("multiplatform") version "1.6.10"
-  kotlin("plugin.serialization") version "1.6.10"
-  id("org.jetbrains.compose") version "1.1.1"
+  kotlin("multiplatform") version "1.7.10"
+  kotlin("plugin.serialization") version "1.7.10"
+  id("org.jetbrains.compose") version "1.2.0-beta02"
 }
 
 repositories {

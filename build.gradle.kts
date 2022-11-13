@@ -2,9 +2,9 @@
 val firebaseSdkVersion = "1.6.2"
 
 plugins {
-  kotlin("multiplatform") version "1.7.10"
-  kotlin("plugin.serialization") version "1.7.10"
-  id("org.jetbrains.compose") version "1.2.0-beta02"
+  kotlin("multiplatform") version "1.7.20"
+  kotlin("plugin.serialization") version "1.7.20"
+  id("org.jetbrains.compose") version "1.2.1"
 }
 
 repositories {
@@ -27,10 +27,11 @@ kotlin {
       dependencies {
         implementation(compose.web.core)
         implementation(compose.runtime)
-        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.3.2")
+    
+        implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.4.1")
         
-        implementation("com.ionspin.kotlin:bignum:0.3.4")
-        implementation("com.ionspin.kotlin:bignum-serialization-kotlinx:0.3.4")
+        implementation("com.ionspin.kotlin:bignum:0.3.7")
+        implementation("com.ionspin.kotlin:bignum-serialization-kotlinx:0.3.7")
   
         implementation("dev.gitlive:firebase-firestore-js:$firebaseSdkVersion")
         

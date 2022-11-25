@@ -1,5 +1,5 @@
 import kotlinx.coroutines.MainScope
-import minima.MDS
+import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.dom.A
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Text
@@ -10,14 +10,15 @@ val scope = MainScope()
 external fun require(module: String): dynamic
 
 fun main() {
-  init()
-  
+  scope.launch {
+    init(getParams("uid"))
+  }
   renderComposableInBody {
     A("minipay.apk") {
       Text("Download standalone Android app")
     }
     Br()
-    Text("UID: ${MDS.minidappuid}")
+    Text("UID: ${getParams("uid")}")
     Br()
     Receive()
     Br()

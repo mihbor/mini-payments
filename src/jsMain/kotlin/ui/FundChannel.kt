@@ -15,7 +15,7 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import minima.*
+import ltd.mbor.minimak.*
 import multisigScriptAddress
 import multisigScriptBalances
 import newTxId
@@ -69,9 +69,9 @@ fun FundChannel() {
           showFundScanner = false
         }.also { it.start() }
         
-        myTriggerKey = newKey()
-        myUpdateKey = newKey()
-        mySettleKey = newKey()
+        myTriggerKey = MDS.newKey()
+        myUpdateKey = MDS.newKey()
+        mySettleKey = MDS.newKey()
         fundingTxStatus = ""
         triggerTxStatus = ""
         settlementTxStatus = ""
@@ -167,18 +167,18 @@ fun FundChannel() {
           showFundScanner = false
           qrScanner?.stop()
           scope.launch {
-            multisigScriptAddress = deployScript(triggerScript(myTriggerKey, otherTriggerKey))
-            eltooScriptAddress = deployScript(eltooScript(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
+            multisigScriptAddress = MDS.deployScript(triggerScript(myTriggerKey, otherTriggerKey))
+            eltooScriptAddress = MDS.deployScript(eltooScript(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
             console.log("multisig address (fund)", multisigScriptAddress)
             val (fundingTxId, fundingTx) = fundingTx(multisigScriptAddress, amount, tokenId)
             fundingTxStatus = "Funding transaction created"
-            myAddress = getAddress()
+            myAddress = MDS.getAddress()
             val (triggerTxId, triggerTx) = signFloatingTx(myTriggerKey, multisigScriptAddress, eltooScriptAddress, fundingTx, mapOf(99 to "0"))
             triggerTxStatus = "Trigger transaction created, signed"
             val (settlementTxId, _) = signFloatingTx(mySettleKey, eltooScriptAddress, myAddress, triggerTx, mapOf(99 to "0"))
             settlementTxStatus = "Settlement transaction created, signed"
-            val exportedTriggerTx = exportTx(triggerTxId)
-            val exportedSettlementTx = exportTx(settlementTxId)
+            val exportedTriggerTx = MDS.exportTx(triggerTxId)
+            val exportedSettlementTx = MDS.exportTx(settlementTxId)
             channel = prepareFundChannel(
               myTriggerKey, myUpdateKey, mySettleKey,
               otherTriggerKey, otherUpdateKey, otherSettleKey,
@@ -199,9 +199,9 @@ fun FundChannel() {
               } else {
                 val (address, triggerTx, settlementTx) = splits
                 counterPartyAddress = address
-                importTx(newTxId(), triggerTx)
+                MDS.importTx(newTxId(), triggerTx)
                 triggerTxStatus += ", received back"
-                importTx(newTxId(), settlementTx)
+                MDS.importTx(newTxId(), settlementTx)
                 settlementTxStatus += ", received back"
                 channel = commitFundChannel(channel!!, fundingTxId, "auto", counterPartyAddress, triggerTx, settlementTx)
                 fundingTxStatus += ", signed and posted!"

@@ -6,7 +6,7 @@ import externals.QrScanner
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
-import minima.MDS
+import ltd.mbor.minimak.MDS
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*

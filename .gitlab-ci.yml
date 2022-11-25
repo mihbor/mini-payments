@@ -2,7 +2,7 @@ image: openjdk:11-jdk
 before_script:
   - export GRADLE_USER_HOME=`pwd`/.gradle
 
-pages:
+Publish:
   stage: build
   script:
     - ./gradlew minidappDistribution

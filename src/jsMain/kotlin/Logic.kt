@@ -1,13 +1,14 @@
 import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
+import kotlinx.browser.window
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.*
-import minima.*
-import minima.State
+import ltd.mbor.minimak.*
+import ltd.mbor.minimak.State
 import kotlin.js.Date
 import kotlin.random.Random
 
@@ -34,17 +35,29 @@ var eltooScriptAddress by mutableStateOf("")
 val multisigScriptBalances = mutableStateListOf<Balance>()
 val eltooScriptCoins = mutableStateMapOf<String, List<Coin>>()
 
-fun init() {
+external fun decodeURIComponent(encodedURI: String): String
+
+fun getParams(parameterName: String): String?{
+  var result: String? = null
+  val items = window.location.search.substring(1).split("&");
+  for (item in items) {
+    val tmp = item.split("=");
+    //console.log("TMP:"+tmp);
+    if (tmp[0] == parameterName) result = decodeURIComponent(tmp[1])
+  }
+  return result
+}
+
+suspend fun init(uid: String?) {
 //  Minima.debug = true
 //  MDS.logging = true
-  MDS.init { msg: dynamic ->
-    val event = msg.event
-    when(event) {
+  MDS.init(uid ?: "0x0", window.location.hostname, 9004) { msg: JsonElement ->
+    when(msg.jsonString("event")) {
       "inited" -> {
         if (MDS.logging) console.log("Connected to Minima.")
         scope.launch {
-          blockNumber = getBlockNumber()
-          balances.addAll(getBalances())
+          blockNumber = MDS.getBlockNumber()
+          balances.addAll(MDS.getBalances())
           createDB()
           getChannels(status = "OPEN").forEach {
             subscribe(channelKey(it.myTriggerKey, it.myUpdateKey, it.mySettleKey), from = it.updatedAt).onEach { msg ->
@@ -60,10 +73,10 @@ fun init() {
         }
       }
       "NEWBLOCK" -> {
-        blockNumber = (msg.data.txpow.header.block as String).toInt()
+        blockNumber = msg.jsonObject["data"]!!.jsonObject["txpow"]!!.jsonObject["header"].jsonString("block").toInt()
         if (multisigScriptAddress.isNotEmpty()) {
           scope.launch {
-            val newBalances = getBalances(multisigScriptAddress)
+            val newBalances = MDS.getBalances(multisigScriptAddress)
             if (newBalances.any { it.unconfirmed > ZERO || it.confirmed > ZERO } && multisigScriptBalances.none { it.unconfirmed > ZERO || it.confirmed > ZERO }) setChannelOpen(multisigScriptAddress)
             multisigScriptBalances.clear()
             multisigScriptBalances.addAll(newBalances)
@@ -71,7 +84,7 @@ fun init() {
         }
         if (eltooScriptAddress.isNotEmpty()) {
           scope.launch {
-            eltooScriptCoins.put(eltooScriptAddress, getCoins(address = eltooScriptAddress))
+            eltooScriptCoins.put(eltooScriptAddress, MDS.getCoins(address = eltooScriptAddress))
           }
         }
       }
@@ -84,33 +97,33 @@ suspend fun send(toAddress: String, amount: BigDecimal, tokenId: String): Boolea
   val (inputs, outputs) = withChange(tokenId, amount)
   
   val txncreator = "txncreate id:$txnId;" +
-    inputs.map{ "txninput id:$txnId coinid:${it.coinid};"}.joinToString("") +
+    inputs.map{ "txninput id:$txnId coinid:${it.coinId};"}.joinToString("") +
     "txnoutput id:$txnId amount:${amount.toPlainString()} address:$toAddress tokenid:$tokenId;" +
-    outputs.map{ "txnoutput id:$txnId amount:${it.amount.toPlainString()} address:${it.address} tokenid:${it.tokenid};"}.joinToString("") +
+    outputs.map{ "txnoutput id:$txnId amount:${it.amount.toPlainString()} address:${it.address} tokenid:${it.tokenId};"}.joinToString("") +
     "txnsign id:$txnId publickey:auto;" +
     "txnpost id:$txnId auto:true;" +
     "txndelete id:$txnId;"
   
-  val result = MDS.cmd(txncreator) as Array<dynamic>
-  val txnpost = result.find{it.command == "txnpost"}
-  console.log("send", txnpost.status)
-  return txnpost.status
+  val result = MDS.cmd(txncreator)!!.jsonArray
+  val txnpost = result.find{ it.jsonString("command") == "txnpost"}
+  console.log("send", txnpost.jsonString("status"))
+  return txnpost.jsonString("status").toBoolean()
 }
 
 suspend fun withChange(tokenId: String, amount: BigDecimal): Pair<List<Coin>, List<Output>> {
   val inputs = mutableListOf<Coin>()
   val outputs = mutableListOf<Output>()
-  val coins = getCoins(tokenId = tokenId, sendable = true).ofAtLeast(amount)
+  val coins = MDS.getCoins(tokenId = tokenId, sendable = true).ofAtLeast(amount)
   coins.forEach { inputs.add(it) }
-  val change = coins.sumOf { it.tokenamount ?: it.amount } - amount
-  if (change > ZERO) outputs.add(Output(newAddress(), change, tokenId))
+  val change = coins.sumOf { it.tokenAmount } - amount
+  if (change > ZERO) outputs.add(Output(MDS.newAddress(), change, tokenId))
   return inputs to outputs
 }
 
 fun List<Coin>.ofAtLeast(amount: BigDecimal): List<Coin> {
-  return firstOrNull { (it.tokenamount ?: it.amount) >= amount }
+  return firstOrNull { it.tokenAmount >= amount }
     ?.let{ listOf(it) }
-    ?: (listOf(last()) + take(size-1).ofAtLeast(amount - (last().tokenamount ?: last().amount)))
+    ?: (listOf(last()) + take(size-1).ofAtLeast(amount - last().tokenAmount))
 }
 
 fun <T> Iterable<T>.sumOf(selector: (T) -> BigDecimal) = fold(ZERO) { acc, item -> acc + selector(item) }
@@ -120,18 +133,18 @@ suspend fun fundingTx(toAddress: String, amount: BigDecimal, tokenId: String): P
   val (inputs, outputs) = withChange(tokenId, amount)
   
   val txncreator = "txncreate id:$txnId;" +
-    inputs.map{ "txninput id:$txnId coinid:${it.coinid};"}.joinToString("") +
+    inputs.map{ "txninput id:$txnId coinid:${it.coinId};"}.joinToString("") +
     "txnoutput id:$txnId amount:${amount.toPlainString()} address:$toAddress tokenid:$tokenId;" +
-    outputs.map{ "txnoutput id:$txnId amount:${it.amount.toPlainString()} address:${it.address} tokenid:${it.tokenid};"}.joinToString("")
+    outputs.map{ "txnoutput id:$txnId amount:${it.amount.toPlainString()} address:${it.address} tokenid:${it.tokenId};"}.joinToString("")
   
-  val result = MDS.cmd(txncreator) as Array<dynamic>
+  val result = MDS.cmd(txncreator)!!.jsonArray
   val txn = result.last()
-  return txnId to txn.response
+  return txnId to txn.jsonObject["response"]
 }
 
 suspend fun signAndExportTx(id: Int, key: String): String {
-  signTx(id, key)
-  return exportTx(id)
+  MDS.signTx(id, key)
+  return MDS.exportTx(id)
 }
 
 suspend fun signFloatingTx(
@@ -150,28 +163,28 @@ suspend fun signFloatingTx(
     "txnoutput id:$txnId amount:${output.amount} address:$targetAddress;" +
     "txnsign id:$txnId publickey:$myKey;"
   
-  val result = MDS.cmd(txncreator) as Array<dynamic>
-  val txnoutput = result.find{it.command == "txnoutput"}
-  return txnId to txnoutput.response
+  val result = MDS.cmd(txncreator)!!.jsonArray
+  val txnoutput = result.find{ it.jsonString("command") == "txnoutput"}
+  return txnId to txnoutput!!.jsonObject["response"]
 }
 
 suspend fun requestViaChannel(amount: BigDecimal, channel: ChannelState) = sendViaChannel(-amount, channel)
 
 suspend fun sendViaChannel(amount: BigDecimal, channel: ChannelState) {
-  val currentSettlementTx = importTx(newTxId(), channel.settlementTx)
-  val input = json.decodeFromJsonElement<Input>(currentSettlementTx["inputs"]!!.jsonArray.first())
+  val currentSettlementTx = MDS.importTx(newTxId(), channel.settlementTx)
+  val input = json.decodeFromJsonElement<Coin>(currentSettlementTx["inputs"]!!.jsonArray.first())
   val state = currentSettlementTx["state"]!!.jsonArray.find{ it.jsonObject["port"]!!.jsonPrimitive.int == 99 }!!.jsonObject["data"]!!.jsonPrimitive.content
   val updateTxnId = newTxId()
   val updatetxncreator = "txncreate id:$updateTxnId;" +
-    "txninput id:$updateTxnId address:${input.address} amount:${input.amount} tokenid:${input.tokenid} floating:true;" +
+    "txninput id:$updateTxnId address:${input.address} amount:${input.amount} tokenid:${input.tokenId} floating:true;" +
     "txnstate id:$updateTxnId port:99 value:${state.toInt() + 1};" +
     "txnoutput id:$updateTxnId amount:${input.amount} address:${input.address};" +
     "txnsign id:$updateTxnId publickey:${channel.myUpdateKey};" +
     "txnexport id:$updateTxnId;"
-  val updateTxn = (MDS.cmd(updatetxncreator) as Array<dynamic>).last()
+  val updateTxn = MDS.cmd(updatetxncreator)!!.jsonArray.last()
   val settleTxnId = newTxId()
   val settletxncreator = "txncreate id:$settleTxnId;" +
-    "txninput id:$settleTxnId address:${input.address} amount:${input.amount} tokenid:${input.tokenid} floating:true;" +
+    "txninput id:$settleTxnId address:${input.address} amount:${input.amount} tokenid:${input.tokenId} floating:true;" +
     "txnstate id:$settleTxnId port:99 value:${state.toInt() + 1};" +
     (if(channel.myBalance - amount > ZERO)
       "txnoutput id:$settleTxnId amount:${(channel.myBalance - amount).toPlainString()} address:${channel.myAddress};"
@@ -181,11 +194,11 @@ suspend fun sendViaChannel(amount: BigDecimal, channel: ChannelState) {
       else "") +
     "txnsign id:$settleTxnId publickey:${channel.mySettleKey};" +
     "txnexport id:$settleTxnId;"
-  val settleTxn = (MDS.cmd(settletxncreator) as Array<dynamic>).last()
+  val settleTxn = MDS.cmd(settletxncreator)!!.jsonArray.last()
   
   publish(
     channelKey(channel.counterPartyTriggerKey, channel.counterPartyUpdateKey, channel.counterPartySettleKey),
-    listOf(if(amount > ZERO) "TXN_UPDATE" else "TXN_REQUEST", updateTxn.response.data, settleTxn.response.data).joinToString(";")
+    listOf(if(amount > ZERO) "TXN_UPDATE" else "TXN_REQUEST", updateTxn.jsonObject["response"]!!.jsonObject["data"], settleTxn.jsonObject["response"].jsonString("data")).joinToString(";")
   )
 }
 
@@ -194,17 +207,17 @@ fun channelKey(vararg keys: String) = keys.joinToString(";")
 suspend fun ChannelState.update(isAck: Boolean, updateTx: String, settleTx: String): ChannelState {
   console.log("Updating channel")
   val updateTxnId = newTxId()
-  importTx(updateTxnId, updateTx)
+  MDS.importTx(updateTxnId, updateTx)
   val settleTxnId = newTxId()
-  val importedSettleTx = importTx(settleTxnId, settleTx)
+  val importedSettleTx = MDS.importTx(settleTxnId, settleTx)
   
   if (!isAck) {
     val signedUpdateTx = signAndExportTx(updateTxnId, myUpdateKey)
     val signedSettleTx = signAndExportTx(settleTxnId, mySettleKey)
     publish(channelKey(counterPartyTriggerKey, counterPartyUpdateKey, counterPartySettleKey), listOf("TXN_UPDATE_ACK", signedUpdateTx, signedSettleTx).joinToString(";"))
   }
-  val outputs = importedSettleTx["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
-  val channelBalance = outputs.find { it.miniaddress == myAddress }!!.amount to outputs.find { it.miniaddress == counterPartyAddress }!!.amount
+  val outputs = importedSettleTx["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Coin>(it) }
+  val channelBalance = outputs.find { it.miniAddress == myAddress }!!.amount to outputs.find { it.miniAddress == counterPartyAddress }!!.amount
   val sequenceNumber = importedSettleTx["state"]!!.jsonArray.map { json.decodeFromJsonElement<State>(it) }.find { it.port == 99 }?.data?.toInt()
   
   return updateChannel(this, channelBalance, sequenceNumber!!, updateTx, settleTx)
@@ -239,15 +252,15 @@ suspend fun prepareFundChannel(
       '$multisigAddress', '$eltooAddress', '$myAddress', ''
     );
   """)
-  val sql = MDS.sql("SELECT IDENTITY() as ID;")
-  val results = sql.rows as Array<dynamic>
+  val sql = MDS.sql("SELECT IDENTITY() as ID;")!!
+  val results = sql.jsonObject["rows"]!!.jsonArray
 
   publish(
     channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey),
     listOf(timeLock, myTriggerKey, myUpdateKey, mySettleKey, triggerTx, settlementTx).joinToString(";")
   )
   return ChannelState(
-    id = (results[0]["ID"] as String).toInt(),
+    id = (results[0].jsonString("ID")).toInt(),
     sequenceNumber = 0,
     status = "OFFERED",
     myBalance = amount,
@@ -278,10 +291,10 @@ suspend fun commitFundChannel(
   val txncreator = "txnsign id:$txnId publickey:$key;" +
     "txnpost id:$txnId auto:true;" +
     "txndelete id:$txnId;"
-  val result = MDS.cmd(txncreator) as Array<dynamic>
-  val status = result.find{it.command == "txnpost"}.status
+  val result = MDS.cmd(txncreator)!!.jsonArray
+  val status = result.find{ it.jsonString("command") == "txnpost"}.jsonString("status")
   console.log("txnpost status", status)
-  if (status == true) {
+  if (status.toBoolean()) {
     MDS.sql("""UPDATE channel SET
       other_address = '$counterPartyAddress',
       trigger_tx = '$triggerTx',
@@ -324,14 +337,14 @@ suspend fun joinChannel(
     );
   """)
   val sql = MDS.sql("SELECT IDENTITY() as ID;")
-  val results = sql.rows as Array<dynamic>
+  val results = sql!!.jsonObject["rows"]!!.jsonArray
   
   publish(
     channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey),
     listOf(myAddress, triggerTx, settlementTx).joinToString(";")
   )
   return ChannelState(
-    id = (results[0]["ID"] as String).toInt(),
+    id = (results[0].jsonString("ID")).toInt(),
     sequenceNumber = 0,
     status = "OFFERED",
     myBalance = ZERO,
@@ -354,8 +367,8 @@ suspend fun joinChannel(
 
 suspend fun importAndPost(tx: String): dynamic {
   val txId = newTxId()
-  importTx(txId, tx)
-  return post(txId)
+  MDS.importTx(txId, tx)
+  return MDS.post(txId)
 }
 
 suspend fun ChannelState.triggerSettlement(): ChannelState {

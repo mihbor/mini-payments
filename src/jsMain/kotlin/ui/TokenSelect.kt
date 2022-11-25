@@ -19,9 +19,9 @@ fun TokenSelect(tokenId: String, disabled: Boolean = false, setTokenId: (String)
     }
   }) {
     balances.forEach { balance ->
-      key(balance.tokenid) {
-        Option(balance.tokenid, { if (balance.tokenid == tokenId) selected() }) {
-          Text("${balance.token?.name ?: "Minima"} (${balance.sendable.toPlainString()})")
+      key(balance.tokenId) {
+        Option(balance.tokenId, { if (balance.tokenId == tokenId) selected() }) {
+          Text("${balance.tokenName ?: "Minima"} (${balance.sendable.toPlainString()})")
         }
       }
     }

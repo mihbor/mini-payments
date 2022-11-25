@@ -6,7 +6,8 @@ import blockNumber
 import eltooScriptCoins
 import getChannels
 import kotlinx.coroutines.launch
-import minima.getCoins
+import ltd.mbor.minimak.MDS
+import ltd.mbor.minimak.getCoins
 import org.jetbrains.compose.web.css.LineStyle
 import org.jetbrains.compose.web.css.border
 import org.jetbrains.compose.web.dom.*
@@ -76,7 +77,7 @@ private fun loadChannels(channels: MutableList<ChannelState>) {
     channels.clear()
     channels.addAll(newChannels)
     newChannels.forEach {
-      eltooScriptCoins.put(it.eltooAddress, getCoins(address = it.eltooAddress))
+      eltooScriptCoins.put(it.eltooAddress, MDS.getCoins(address = it.eltooAddress))
     }
   }
 }

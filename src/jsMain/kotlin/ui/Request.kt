@@ -5,8 +5,8 @@ import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
-import minima.MDS
-import minima.newAddress
+import ltd.mbor.minimak.MDS
+import ltd.mbor.minimak.newAddress
 import org.jetbrains.compose.web.css.DisplayStyle
 import org.jetbrains.compose.web.css.LineStyle
 import org.jetbrains.compose.web.css.border
@@ -45,7 +45,7 @@ fun Receive() {
     onClick {
       showReceive = !showReceive
       if (showReceive) scope.launch {
-        myAddress = newAddress()
+        myAddress = MDS.newAddress()
         drawQR(myAddress, tokenId)
       } else {
         myAddress = ""

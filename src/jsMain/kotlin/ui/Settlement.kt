@@ -4,7 +4,7 @@ import ChannelState
 import androidx.compose.runtime.*
 import completeSettlement
 import kotlinx.coroutines.launch
-import minima.Coin
+import ltd.mbor.minimak.Coin
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Button
@@ -38,7 +38,7 @@ fun Settlement(channel: ChannelState, blockNumber: Int, eltooScriptCoins: List<C
   if (eltooScriptCoins.isNotEmpty()) {
     eltooScriptCoins.forEach {
       Br()
-      Text("[${it.tokenid}] token eltoo coin: ${it.tokenamount?.toPlainString() ?: it.amount.toPlainString()} timelock ${
+      Text("[${it.tokenId}] token eltoo coin: ${it.tokenAmount.toPlainString()} timelock ${
         (it.created.toInt() + channel.timeLock - blockNumber).takeIf { it > 0 }?.let { "ends in $it blocks" } ?: "ended"}"
       )
     }

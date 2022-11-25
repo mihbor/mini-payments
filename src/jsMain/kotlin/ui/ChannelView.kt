@@ -4,8 +4,8 @@ import ChannelState
 import androidx.compose.runtime.Composable
 import blockNumber
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
-import minima.Balance
-import minima.Coin
+import ltd.mbor.minimak.Balance
+import ltd.mbor.minimak.Coin
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Text
 
@@ -18,7 +18,7 @@ fun ChannelView(
 ) {
   Br()
   multisigScriptBalances.forEach {
-    Text("[${it.tokenid}] token funding balance: ${it.confirmed.toPlainString()}")
+    Text("[${it.tokenId}] token funding balance: ${it.confirmed.toPlainString()}")
     Br()
   }
   if (multisigScriptBalances.any { it.unconfirmed > ZERO || it.confirmed > ZERO }) {

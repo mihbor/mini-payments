@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
-import minima.*
+import ltd.mbor.minimak.*
 import multisigScriptAddress
 import multisigScriptBalances
 import newTxId
@@ -54,9 +54,9 @@ fun RequestChannel() {
       showJoinChannel = !showJoinChannel
       val canvas = document.getElementById("joinChannelQR") as HTMLCanvasElement
       if(showJoinChannel) scope.launch {
-        myTriggerKey = newKey()
-        myUpdateKey = newKey()
-        mySettleKey = newKey()
+        myTriggerKey = MDS.newKey()
+        myUpdateKey = MDS.newKey()
+        mySettleKey = MDS.newKey()
         triggerTxStatus = ""
         settlementTxStatus= ""
         QRCode.toCanvas(canvas, "$myTriggerKey;$myUpdateKey;$mySettleKey"
@@ -77,21 +77,21 @@ fun RequestChannel() {
                 otherSettleKey = splits[3]
                 val triggerTx = splits[4]
                 val settlementTx = splits[5]
-                multisigScriptAddress = deployScript(triggerScript(otherTriggerKey, myTriggerKey))
-                eltooScriptAddress = deployScript(eltooScript(timeLock, otherUpdateKey, myUpdateKey, otherSettleKey, mySettleKey))
+                multisigScriptAddress = MDS.deployScript(triggerScript(otherTriggerKey, myTriggerKey))
+                eltooScriptAddress = MDS.deployScript(eltooScript(timeLock, otherUpdateKey, myUpdateKey, otherSettleKey, mySettleKey))
                 newTxId().also { triggerTxId ->
-                  val outputs = importTx(triggerTxId, triggerTx)["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Output>(it) }
+                  val outputs = MDS.importTx(triggerTxId, triggerTx)["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Coin>(it) }
                   val amount = outputs.find { it.address == eltooScriptAddress }!!.amount
                   val signedTriggerTx = signAndExportTx(triggerTxId, myTriggerKey)
                   triggerTxStatus = "Trigger transaction received, signed"
                   newTxId().also { settlementTxId ->
-                    importTx(settlementTxId, settlementTx).also {
-                      val output = json.decodeFromJsonElement<Output>(it["outputs"]!!.jsonArray.first())
-                      counterPartyAddress = output.miniaddress
+                    MDS.importTx(settlementTxId, settlementTx).also {
+                      val output = json.decodeFromJsonElement<Coin>(it["outputs"]!!.jsonArray.first())
+                      counterPartyAddress = output.miniAddress
                     }
                     val signedSettlementTx = signAndExportTx(settlementTxId, mySettleKey)
                     settlementTxStatus = "Settlement transaction received, signed"
-                    myAddress = getAddress()
+                    myAddress = MDS.getAddress()
                     channel = joinChannel(
                       myTriggerKey, myUpdateKey, mySettleKey,
                       otherTriggerKey, otherUpdateKey, otherSettleKey,

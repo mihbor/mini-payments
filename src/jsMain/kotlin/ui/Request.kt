@@ -21,12 +21,12 @@ import scope
 
 val QRCode = require("qrcode")
 
-fun drawQR(address: String, tokenId:String, amount:String = "") {
+fun drawQR(address: String, tokenId: String, amount:String = "") {
   val canvas = document.getElementById("receiveQR") as HTMLCanvasElement
-  QRCode.toCanvas(canvas, "$address;$tokenId;$amount", { error ->
+  QRCode.toCanvas(canvas, "$address;$tokenId;$amount") { error ->
     if (error != null) console.error(error)
     else console.log("qr generated")
-  })
+  }
 }
 
 fun clearQR() {
@@ -60,13 +60,17 @@ fun Receive() {
   }
   Br()
   if (showReceive) {
-    Text(myAddress)
+    Text("My address: $myAddress")
+    Br()
     TokenSelect(tokenId) {
       tokenId = it
-      drawQR(myAddress, tokenId)
+      drawQR(myAddress, tokenId, amount.toPlainString())
     }
     DecimalNumberInput(amount, min = BigDecimal.ZERO) {
-      it?.let { amount = it }
+      it?.let {
+        amount = it
+        drawQR(myAddress, tokenId, amount.toPlainString())
+      }
     }
     Button({
       onClick {

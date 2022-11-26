@@ -1,6 +1,7 @@
 package ui
 
 import androidx.compose.runtime.*
+import balances
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import externals.QrScanner
 import kotlinx.browser.document
@@ -60,9 +61,11 @@ fun Send() {
         width(400.px)
       }
     }
+    Br()
     DecimalNumberInput(amount, min = ZERO) {
       it?.let { amount = it }
     }
+    TokenIcon(tokenId, balances)
     TokenSelect(tokenId) {
       tokenId = it
     }

@@ -9,6 +9,7 @@ import org.jetbrains.compose.web.css.Color.red
 import org.jetbrains.compose.web.css.LineStyle.Companion.Solid
 import org.jetbrains.compose.web.css.border
 import org.jetbrains.compose.web.css.px
+import org.jetbrains.compose.web.css.width
 import org.jetbrains.compose.web.dom.TextInput
 
 @Composable
@@ -30,6 +31,7 @@ fun DecimalNumberInput(
     if (disabled) this.disabled()
     style {
       if (!isValid) border(1.px, Solid, red)
+      width(80.px)
     }
     onInput {
       if (it.value.isEmpty()) {

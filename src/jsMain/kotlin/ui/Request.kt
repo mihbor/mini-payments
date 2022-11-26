@@ -1,6 +1,7 @@
 package ui
 
 import androidx.compose.runtime.*
+import balances
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.browser.document
 import kotlinx.browser.window
@@ -62,15 +63,16 @@ fun Receive() {
   if (showReceive) {
     Text("My address: $myAddress")
     Br()
-    TokenSelect(tokenId) {
-      tokenId = it
-      drawQR(myAddress, tokenId, amount.toPlainString())
-    }
     DecimalNumberInput(amount, min = BigDecimal.ZERO) {
       it?.let {
         amount = it
         drawQR(myAddress, tokenId, amount.toPlainString())
       }
+    }
+    TokenIcon(tokenId, balances)
+    TokenSelect(tokenId) {
+      tokenId = it
+      drawQR(myAddress, tokenId, amount.toPlainString())
     }
     Button({
       onClick {

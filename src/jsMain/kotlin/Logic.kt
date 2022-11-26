@@ -25,7 +25,7 @@ RETURN TRUE
 ENDIF
 """
 
-val balances = mutableStateListOf<Balance>()
+val balances = mutableStateMapOf<String, Balance>()
 var blockNumber by mutableStateOf(0)
 
 fun newTxId() = Random.nextInt(1_000_000_000)
@@ -57,7 +57,7 @@ suspend fun init(uid: String?) {
         if (MDS.logging) console.log("Connected to Minima.")
         scope.launch {
           blockNumber = MDS.getBlockNumber()
-          balances.addAll(MDS.getBalances())
+          balances.putAll(MDS.getBalances().associateBy { it.tokenId })
           createDB()
           getChannels(status = "OPEN").forEach {
             subscribe(channelKey(it.myTriggerKey, it.myUpdateKey, it.mySettleKey), from = it.updatedAt).onEach { msg ->

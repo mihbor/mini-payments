@@ -99,45 +99,9 @@ suspend fun isPaymentChannelAvailable(toAddress: String, tokenId: String, amount
   return matchingChannels.isNotEmpty()
 }
 
-suspend fun send(toAddress: String, amount: BigDecimal, tokenId: String): Boolean {
-  val txnId = newTxId()
-  val (inputs, outputs) = withChange(tokenId, amount)
-  
-  val txncreator = "txncreate id:$txnId;" +
-    inputs.map{ "txninput id:$txnId coinid:${it.coinId};"}.joinToString("") +
-    "txnoutput id:$txnId amount:${amount.toPlainString()} address:$toAddress tokenid:$tokenId;" +
-    outputs.map{ "txnoutput id:$txnId amount:${it.amount.toPlainString()} address:${it.address} tokenid:${it.tokenId};"}.joinToString("") +
-    "txnsign id:$txnId publickey:auto;" +
-    "txnpost id:$txnId auto:true;" +
-    "txndelete id:$txnId;"
-  
-  val result = MDS.cmd(txncreator)!!.jsonArray
-  val txnpost = result.find{ it.jsonString("command") == "txnpost"}
-  console.log("send", txnpost.jsonString("status"))
-  return txnpost.jsonString("status").toBoolean()
-}
-
-suspend fun withChange(tokenId: String, amount: BigDecimal): Pair<List<Coin>, List<Output>> {
-  val inputs = mutableListOf<Coin>()
-  val outputs = mutableListOf<Output>()
-  val coins = MDS.getCoins(tokenId = tokenId, sendable = true).ofAtLeast(amount)
-  coins.forEach { inputs.add(it) }
-  val change = coins.sumOf { it.tokenAmount } - amount
-  if (change > ZERO) outputs.add(Output(MDS.newAddress(), change, tokenId))
-  return inputs to outputs
-}
-
-fun List<Coin>.ofAtLeast(amount: BigDecimal): List<Coin> {
-  return firstOrNull { it.tokenAmount >= amount }
-    ?.let{ listOf(it) }
-    ?: (listOf(last()) + take(size-1).ofAtLeast(amount - last().tokenAmount))
-}
-
-fun <T> Iterable<T>.sumOf(selector: (T) -> BigDecimal) = fold(ZERO) { acc, item -> acc + selector(item) }
-
 suspend fun fundingTx(toAddress: String, amount: BigDecimal, tokenId: String): Pair<Int, dynamic> {
   val txnId = newTxId()
-  val (inputs, outputs) = withChange(tokenId, amount)
+  val (inputs, outputs) = MDS.inputsWithChange(tokenId, amount)
   
   val txncreator = "txncreate id:$txnId;" +
     inputs.map{ "txninput id:$txnId coinid:${it.coinId};"}.joinToString("") +

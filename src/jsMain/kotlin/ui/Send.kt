@@ -9,18 +9,19 @@ import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
 import ltd.mbor.minimak.MDS
+import ltd.mbor.minimak.send
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLVideoElement
 import scope
-import send
 
 @Composable
 fun Send() {
   
   var showSend by remember { mutableStateOf(false) }
   var showCam by remember { mutableStateOf(false) }
+  var sending by remember { mutableStateOf(false) }
   var toAddress by remember { mutableStateOf("") }
   var amount by remember { mutableStateOf(ZERO) }
   var tokenId by remember { mutableStateOf("0x00") }
@@ -82,16 +83,19 @@ fun Send() {
         Text("Read NFC (in Android app)")
       }
       Button({
-        if (amount <= 0 || toAddress.isEmpty()) disabled()
+        if (amount <= 0 || toAddress.isEmpty() || sending) disabled()
         onClick {
+          sending = true
           console.log("post $amount [$tokenId] to $toAddress")
           scope.launch {
             if (isPaymentChannelAvailable(toAddress, tokenId, amount) && window.confirm("Found available payment channel. Send in channel instead?")) {
               //TODO: pay in channel instead
             } else {
-              send(toAddress, amount, tokenId)
+              MDS.send(toAddress, amount, tokenId)
             }
+            showCam = false
             showSend = false
+            sending = false
             qrScanner?.stop()
           }
         }

@@ -14,6 +14,7 @@ import org.jetbrains.compose.web.css.border
 import org.jetbrains.compose.web.css.display
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Button
+import org.jetbrains.compose.web.dom.Div
 import org.jetbrains.compose.web.dom.Text
 import org.w3c.dom.CanvasRenderingContext2D
 import org.w3c.dom.HTMLCanvasElement
@@ -42,52 +43,56 @@ fun Receive() {
   var tokenId by remember { mutableStateOf("0x00") }
   var amount by remember { mutableStateOf(BigDecimal.ZERO) }
   
-  Button({
-    onClick {
-      showReceive = !showReceive
-      if (showReceive) scope.launch {
-        myAddress = MDS.newAddress()
-        drawQR(myAddress, tokenId)
-      } else {
-        myAddress = ""
-        clearQR()
-      }
-    }
-    style {
-      if (showReceive) border(style = LineStyle.Inset)
-    }
+  Div({
+    classes(StyleSheets.container)
   }) {
-    Text("Request")
-  }
-  Br()
-  if (showReceive) {
-    Text("My address: $myAddress")
-    Br()
-    DecimalNumberInput(amount, min = BigDecimal.ZERO) {
-      it?.let {
-        amount = it
-        drawQR(myAddress, tokenId, amount.toPlainString())
-      }
-    }
-    TokenIcon(tokenId, balances)
-    TokenSelect(tokenId) {
-      tokenId = it
-      drawQR(myAddress, tokenId, amount.toPlainString())
-    }
     Button({
       onClick {
-        console.log("nfc emit")
-        window.open("minipay://localhost:9004/emit?uid=${MDS.minidappuid}&address=$myAddress&token=$tokenId&amount=${amount.toPlainString()}")
+        showReceive = !showReceive
+        if (showReceive) scope.launch {
+          myAddress = MDS.newAddress()
+          drawQR(myAddress, tokenId)
+        } else {
+          myAddress = ""
+          clearQR()
+        }
+      }
+      style {
+        if (showReceive) border(style = LineStyle.Inset)
       }
     }) {
-      Text("Request on NFC (in Android app)")
+      Text("Request")
     }
+    if (showReceive) {
+      Br()
+      Text("My address: $myAddress")
+      Br()
+      DecimalNumberInput(amount, min = BigDecimal.ZERO) {
+        it?.let {
+          amount = it
+          drawQR(myAddress, tokenId, amount.toPlainString())
+        }
+      }
+      TokenIcon(tokenId, balances)
+      TokenSelect(tokenId) {
+        tokenId = it
+        drawQR(myAddress, tokenId, amount.toPlainString())
+      }
+      Button({
+        onClick {
+          console.log("nfc emit")
+          window.open("minipay://localhost:9004/emit?uid=${MDS.minidappuid}&address=$myAddress&token=$tokenId&amount=${amount.toPlainString()}")
+        }
+      }) {
+        Text("Request on NFC (in Android app)")
+      }
+    }
+    Br()
+    Canvas({
+      id("receiveQR")
+      style {
+        if (!showReceive) display(DisplayStyle.None)
+      }
+    })
   }
-  Br()
-  Canvas({
-    id("receiveQR")
-    style {
-      if (!showReceive) display(DisplayStyle.None)
-    }
-  })
 }

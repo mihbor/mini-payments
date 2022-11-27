@@ -17,51 +17,56 @@ import scope
 fun ChannelListing() {
   var showChannels by remember { mutableStateOf(false) }
   val channels = remember { mutableStateListOf<ChannelState>() }
-  Button({
-    onClick {
-      showChannels = !showChannels
-      if (showChannels) loadChannels(channels)
-    }
-    style {
-      if (showChannels) border(style = LineStyle.Inset)
-    }
+
+  Div({
+    classes(StyleSheets.container)
   }) {
-    Text("Channel listing")
-  }
-  if (showChannels) {
     Button({
       onClick {
-        loadChannels(channels)
+        showChannels = !showChannels
+        if (showChannels) loadChannels(channels)
+      }
+      style {
+        if (showChannels) border(style = LineStyle.Inset)
       }
     }) {
-      Text("Refresh")
+      Text("Channel listing")
     }
-    Table {
-      Thead {
-        Tr {
-          Th { Text("ID") }
-          Th { Text("Status") }
-          Th { Text("Sequence number") }
-          Th { Text("My balance") }
-          Th { Text("Their balance") }
-          Th { Text("Actions") }
+    if (showChannels) {
+      Button({
+        onClick {
+          loadChannels(channels)
         }
+      }) {
+        Text("Refresh")
       }
-      Tbody {
-        channels.forEachIndexed { index, channel ->
+      Table {
+        Thead {
           Tr {
-            Td { Text(channel.id.toString()) }
-            Td { Text(channel.status) }
-            Td { Text(channel.sequenceNumber.toString()) }
-            Td { Text(channel.myBalance.toPlainString()) }
-            Td { Text(channel.counterPartyBalance.toPlainString()) }
-            Td {
-              if (channel.status == "OPEN") {
-                ChannelTransfers(channel)
-                Br()
-              }
-              Settlement(channel, blockNumber, eltooScriptCoins[channel.eltooAddress] ?: emptyList()) {
-                channels[index] = it
+            Th { Text("ID") }
+            Th { Text("Status") }
+            Th { Text("Sequence number") }
+            Th { Text("My balance") }
+            Th { Text("Their balance") }
+            Th { Text("Actions") }
+          }
+        }
+        Tbody {
+          channels.forEachIndexed { index, channel ->
+            Tr {
+              Td { Text(channel.id.toString()) }
+              Td { Text(channel.status) }
+              Td { Text(channel.sequenceNumber.toString()) }
+              Td { Text(channel.myBalance.toPlainString()) }
+              Td { Text(channel.counterPartyBalance.toPlainString()) }
+              Td {
+                if (channel.status == "OPEN") {
+                  ChannelTransfers(channel)
+                  Br()
+                }
+                Settlement(channel, blockNumber, eltooScriptCoins[channel.eltooAddress] ?: emptyList()) {
+                  channels[index] = it
+                }
               }
             }
           }

@@ -113,6 +113,11 @@ suspend fun fundingTx(toAddress: String, amount: BigDecimal, tokenId: String): P
   return txnId to txn.jsonObject["response"]
 }
 
+suspend fun newKeys(count: Int): List<String> {
+  val command = List(count) { "keys action:new;" }.joinToString("\n")
+  return MDS.cmd(command)!!.jsonArray.map { it.jsonObject["response"].jsonString("publickey") }
+}
+
 suspend fun signAndExportTx(id: Int, key: String): String {
   MDS.signTx(id, key)
   return MDS.exportTx(id)

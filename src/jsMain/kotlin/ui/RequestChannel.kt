@@ -17,6 +17,7 @@ import kotlinx.serialization.json.jsonArray
 import ltd.mbor.minimak.*
 import multisigScriptAddress
 import multisigScriptBalances
+import newKeys
 import newTxId
 import org.jetbrains.compose.web.css.DisplayStyle
 import org.jetbrains.compose.web.css.LineStyle
@@ -58,9 +59,11 @@ fun RequestChannel() {
         showJoinChannel = !showJoinChannel
         val canvas = document.getElementById("joinChannelQR") as HTMLCanvasElement
         if (showJoinChannel) scope.launch {
-          myTriggerKey = MDS.newKey()
-          myUpdateKey = MDS.newKey()
-          mySettleKey = MDS.newKey()
+          newKeys(3).apply {
+            myTriggerKey = this[0]
+            myUpdateKey = this[1]
+            mySettleKey = this[2]
+          }
           triggerTxStatus = ""
           settlementTxStatus = ""
           QRCode.toCanvas(

@@ -18,6 +18,7 @@ import kotlinx.coroutines.launch
 import ltd.mbor.minimak.*
 import multisigScriptAddress
 import multisigScriptBalances
+import newKeys
 import newTxId
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
@@ -72,9 +73,11 @@ fun FundChannel() {
             showFundScanner = false
           }.also { it.start() }
         
-          myTriggerKey = MDS.newKey()
-          myUpdateKey = MDS.newKey()
-          mySettleKey = MDS.newKey()
+          newKeys(3).apply {
+            myTriggerKey = this[0]
+            myUpdateKey = this[1]
+            mySettleKey = this[2]
+          }
           fundingTxStatus = ""
           triggerTxStatus = ""
           settlementTxStatus = ""

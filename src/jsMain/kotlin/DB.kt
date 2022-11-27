@@ -48,6 +48,7 @@ suspend fun createDB() {
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
     status VARCHAR,
+    token_id VARCHAR,
     my_balance DECIMAL(20,10),
     other_balance DECIMAL(20,10),
     my_address VARCHAR,

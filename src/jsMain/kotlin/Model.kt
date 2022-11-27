@@ -4,6 +4,7 @@ data class ChannelState(
   val id: Int,
   val sequenceNumber: Int = 0,
   val status: String,
+  val tokenId: String = "0x00",
   val myBalance: BigDecimal,
   val counterPartyBalance: BigDecimal,
   val myAddress: String,

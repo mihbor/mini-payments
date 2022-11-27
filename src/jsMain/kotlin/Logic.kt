@@ -92,6 +92,13 @@ suspend fun init(uid: String?) {
   }
 }
 
+suspend fun isPaymentChannelAvailable(toAddress: String, tokenId: String, amount: BigDecimal): Boolean {
+  val matchingChannels = getChannels(status = "OPEN").filter {
+    it.counterPartyAddress == toAddress && it.tokenId == tokenId && it.myBalance >= amount
+  }
+  return matchingChannels.isNotEmpty()
+}
+
 suspend fun send(toAddress: String, amount: BigDecimal, tokenId: String): Boolean {
   val txnId = newTxId()
   val (inputs, outputs) = withChange(tokenId, amount)

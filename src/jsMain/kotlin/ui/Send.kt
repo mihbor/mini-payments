@@ -4,6 +4,7 @@ import androidx.compose.runtime.*
 import balances
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import externals.QrScanner
+import isPaymentChannelAvailable
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
@@ -81,10 +82,14 @@ fun Send() {
       if(amount <= 0 || toAddress.isEmpty()) disabled()
       onClick {
         console.log("post $amount [$tokenId] to $toAddress")
-        showSend = false
-        qrScanner?.stop()
         scope.launch {
-          send(toAddress, amount, tokenId)
+          if (isPaymentChannelAvailable(toAddress, tokenId, amount) && window.confirm("Found available payment channel. Send in channel instead?")) {
+            //TODO: pay in channel instead
+          } else {
+            send(toAddress, amount, tokenId)
+          }
+          showSend = false
+          qrScanner?.stop()
         }
       }
     }) {

@@ -1,7 +1,10 @@
 package ui
 
 import ChannelState
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.remember
 import balances
 import blockNumber
 import eltooScriptCoins
@@ -9,71 +12,54 @@ import getChannels
 import kotlinx.coroutines.launch
 import ltd.mbor.minimak.MDS
 import ltd.mbor.minimak.getCoins
-import org.jetbrains.compose.web.css.LineStyle
-import org.jetbrains.compose.web.css.border
 import org.jetbrains.compose.web.dom.*
 import scope
 
 @Composable
 fun ChannelListing() {
-  var showChannels by remember { mutableStateOf(false) }
   val channels = remember { mutableStateListOf<ChannelState>() }
 
-  Div({
-    classes(StyleSheets.container)
-  }) {
-    Button({
-      onClick {
-        showChannels = !showChannels
-        if (showChannels) loadChannels(channels)
+  LaunchedEffect("channels") { loadChannels(channels) }
+  Button({
+    onClick {
+      scope.launch {
+        loadChannels(channels)
       }
-      style {
-        if (showChannels) border(style = LineStyle.Inset)
-      }
-    }) {
-      Text("Channel listing")
     }
-    if (showChannels) {
-      Button({
-        onClick {
-          loadChannels(channels)
-        }
-      }) {
-        Text("Refresh")
+  }) {
+    Text("Refresh")
+  }
+  Table {
+    Thead {
+      Tr {
+        Th { Text("ID") }
+        Th { Text("Status") }
+        Th { Text("Sequence number") }
+        Th { Text("Token") }
+        Th { Text("My balance") }
+        Th { Text("Their balance") }
+        Th { Text("Actions") }
       }
-      Table {
-        Thead {
-          Tr {
-            Th { Text("ID") }
-            Th { Text("Status") }
-            Th { Text("Sequence number") }
-            Th { Text("Token") }
-            Th { Text("My balance") }
-            Th { Text("Their balance") }
-            Th { Text("Actions") }
+    }
+    Tbody {
+      channels.forEachIndexed { index, channel ->
+        Tr {
+          Td { Text(channel.id.toString()) }
+          Td { Text(channel.status) }
+          Td { Text(channel.sequenceNumber.toString()) }
+          Td {
+            TokenIcon(channel.tokenId, balances)
+            Text(balances[channel.tokenId]?.tokenName ?: channel.tokenId)
           }
-        }
-        Tbody {
-          channels.forEachIndexed { index, channel ->
-            Tr {
-              Td { Text(channel.id.toString()) }
-              Td { Text(channel.status) }
-              Td { Text(channel.sequenceNumber.toString()) }
-              Td {
-                TokenIcon(channel.tokenId, balances)
-                Text(balances[channel.tokenId]?.tokenName ?: channel.tokenId)
-              }
-              Td { Text(channel.myBalance.toPlainString()) }
-              Td { Text(channel.counterPartyBalance.toPlainString()) }
-              Td {
-                if (channel.status == "OPEN") {
-                  ChannelTransfers(channel)
-                  Br()
-                }
-                Settlement(channel, blockNumber, eltooScriptCoins[channel.eltooAddress] ?: emptyList()) {
-                  channels[index] = it
-                }
-              }
+          Td { Text(channel.myBalance.toPlainString()) }
+          Td { Text(channel.counterPartyBalance.toPlainString()) }
+          Td {
+            if (channel.status == "OPEN") {
+              ChannelTransfers(channel)
+              Br()
+            }
+            Settlement(channel, blockNumber, eltooScriptCoins[channel.eltooAddress] ?: emptyList()) {
+              channels[index] = it
             }
           }
         }
@@ -82,13 +68,11 @@ fun ChannelListing() {
   }
 }
 
-private fun loadChannels(channels: MutableList<ChannelState>) {
-  scope.launch {
-    val newChannels = getChannels()
-    channels.clear()
-    channels.addAll(newChannels)
-    newChannels.forEach {
-      eltooScriptCoins.put(it.eltooAddress, MDS.getCoins(address = it.eltooAddress))
-    }
+suspend fun loadChannels(channels: MutableList<ChannelState>) {
+  val newChannels = getChannels()
+  channels.clear()
+  channels.addAll(newChannels)
+  newChannels.forEach {
+    eltooScriptCoins.put(it.eltooAddress, MDS.getCoins(address = it.eltooAddress))
   }
 }

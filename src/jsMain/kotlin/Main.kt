@@ -1,7 +1,10 @@
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.web.css.Style
-import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.renderComposableInBody
 import ui.*
 
@@ -13,17 +16,16 @@ fun main() {
     init(getParams("uid"))
   }
   renderComposableInBody {
+    var view by remember { mutableStateOf("settings") }
     Style(StyleSheets)
-    Header()
-    Br()
-    Receive()
-    Br()
-    Send()
-    Br()
-    FundChannel()
-    Br()
-    RequestChannel()
-    Br()
-    ChannelListing()
+    Menu{ view = it }
+    when(view) {
+      "receive" -> Receive()
+      "send" -> Send()
+      "fund channel" -> FundChannel()
+      "request channel" -> RequestChannel()
+      "channels" -> ChannelListing()
+      "settings" -> Settings()
+    }
   }
 }

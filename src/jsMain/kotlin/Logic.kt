@@ -73,11 +73,15 @@ suspend fun init(uid: String?) {
         }
       }
       "NEWBLOCK" -> {
-        blockNumber = msg.jsonObject["data"]!!.jsonObject["txpow"]!!.jsonObject["header"].jsonString("block").toInt()
+        blockNumber = msg.jsonObject["data"]!!.jsonObject["txpow"]!!.jsonObject["header"]!!.jsonString("block")!!.toInt()
         if (multisigScriptAddress.isNotEmpty()) {
           scope.launch {
             val newBalances = MDS.getBalances(multisigScriptAddress)
-            if (newBalances.any { it.unconfirmed > ZERO || it.confirmed > ZERO } && multisigScriptBalances.none { it.unconfirmed > ZERO || it.confirmed > ZERO }) setChannelOpen(multisigScriptAddress)
+            if (newBalances.any { it.unconfirmed > ZERO || it.confirmed > ZERO }
+              && multisigScriptBalances.none { it.unconfirmed > ZERO || it.confirmed > ZERO }
+            ) {
+              setChannelOpen(multisigScriptAddress)
+            }
             multisigScriptBalances.clear()
             multisigScriptBalances.addAll(newBalances)
           }
@@ -115,7 +119,7 @@ suspend fun fundingTx(toAddress: String, amount: BigDecimal, tokenId: String): P
 
 suspend fun newKeys(count: Int): List<String> {
   val command = List(count) { "keys action:new;" }.joinToString("\n")
-  return MDS.cmd(command)!!.jsonArray.map { it.jsonObject["response"].jsonString("publickey") }
+  return MDS.cmd(command)!!.jsonArray.map { it.jsonObject["response"]!!.jsonString("publickey")!! }
 }
 
 suspend fun signAndExportTx(id: Int, key: String): String {
@@ -174,7 +178,7 @@ suspend fun sendViaChannel(amount: BigDecimal, channel: ChannelState) {
   
   publish(
     channelKey(channel.counterPartyTriggerKey, channel.counterPartyUpdateKey, channel.counterPartySettleKey),
-    listOf(if(amount > ZERO) "TXN_UPDATE" else "TXN_REQUEST", updateTxn.jsonObject["response"]!!.jsonObject["data"], settleTxn.jsonObject["response"].jsonString("data")).joinToString(";")
+    listOf(if(amount > ZERO) "TXN_UPDATE" else "TXN_REQUEST", updateTxn.jsonObject["response"]!!.jsonObject["data"], settleTxn.jsonObject["response"]!!.jsonString("data")).joinToString(";")
   )
 }
 
@@ -236,7 +240,7 @@ suspend fun prepareFundChannel(
     listOf(timeLock, myTriggerKey, myUpdateKey, mySettleKey, triggerTx, settlementTx).joinToString(";")
   )
   return ChannelState(
-    id = (results[0].jsonString("ID")).toInt(),
+    id = results[0].jsonString("ID")!!.toInt(),
     sequenceNumber = 0,
     status = "OFFERED",
     myBalance = amount,
@@ -268,7 +272,7 @@ suspend fun commitFundChannel(
     "txnpost id:$txnId auto:true;" +
     "txndelete id:$txnId;"
   val result = MDS.cmd(txncreator)!!.jsonArray
-  val status = result.find{ it.jsonString("command") == "txnpost"}.jsonString("status")
+  val status = result.find{ it.jsonString("command") == "txnpost" }!!.jsonString("status")
   console.log("txnpost status", status)
   if (status.toBoolean()) {
     MDS.sql("""UPDATE channel SET
@@ -320,7 +324,7 @@ suspend fun joinChannel(
     listOf(myAddress, triggerTx, settlementTx).joinToString(";")
   )
   return ChannelState(
-    id = (results[0].jsonString("ID")).toInt(),
+    id = results[0].jsonString("ID")!!.toInt(),
     sequenceNumber = 0,
     status = "OFFERED",
     myBalance = ZERO,

@@ -2,6 +2,7 @@ package ui
 
 import ChannelState
 import androidx.compose.runtime.*
+import balances
 import blockNumber
 import eltooScriptCoins
 import getChannels
@@ -46,6 +47,7 @@ fun ChannelListing() {
             Th { Text("ID") }
             Th { Text("Status") }
             Th { Text("Sequence number") }
+            Th { Text("Token") }
             Th { Text("My balance") }
             Th { Text("Their balance") }
             Th { Text("Actions") }
@@ -57,6 +59,10 @@ fun ChannelListing() {
               Td { Text(channel.id.toString()) }
               Td { Text(channel.status) }
               Td { Text(channel.sequenceNumber.toString()) }
+              Td {
+                TokenIcon(channel.tokenId, balances)
+                Text(balances[channel.tokenId]?.tokenName ?: channel.tokenId)
+              }
               Td { Text(channel.myBalance.toPlainString()) }
               Td { Text(channel.counterPartyBalance.toPlainString()) }
               Td {

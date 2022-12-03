@@ -61,5 +61,5 @@ tasks.register<Zip>("minidappDistribution") {
 }
 
 configurations.all {
-  resolutionStrategy.cacheChangingModulesFor(5, "minutes")
+  resolutionStrategy.cacheChangingModulesFor(1, "hours")
 }

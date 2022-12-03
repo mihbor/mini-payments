@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.mapNotNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import ltd.mbor.minimak.MDS
+import ltd.mbor.minimak.jsonString
 import kotlin.js.Date
 
 val firebaseApp = Firebase.initialize(options= FirebaseOptions(
@@ -75,25 +76,25 @@ suspend fun getChannels(status: String? = null): List<ChannelState> {
   
   return rows.map { row ->
     ChannelState(
-      id = (row.jsonString("ID")).toInt(),
-      sequenceNumber = (row.jsonString("SEQUENCE_NUMBER")).toInt(),
-      status = row.jsonString("STATUS"),
-      myBalance = (row.jsonString("MY_BALANCE")).toBigDecimal(),
-      counterPartyBalance = (row.jsonString("OTHER_BALANCE")).toBigDecimal(),
-      myAddress = row.jsonString("MY_ADDRESS"),
-      myTriggerKey = row.jsonString("MY_TRIGGER_KEY"),
-      myUpdateKey = row.jsonString("MY_UPDATE_KEY"),
-      mySettleKey = row.jsonString("MY_SETTLE_KEY"),
-      counterPartyAddress = row.jsonString("OTHER_ADDRESS"),
-      counterPartyTriggerKey = row.jsonString("OTHER_TRIGGER_KEY"),
-      counterPartyUpdateKey = row.jsonString("OTHER_UPDATE_KEY"),
-      counterPartySettleKey = row.jsonString("OTHER_SETTLE_KEY"),
-      triggerTx = row.jsonString("TRIGGER_TX"),
-      updateTx = row.jsonString("UPDATE_TX"),
-      settlementTx = row.jsonString("SETTLE_TX"),
-      timeLock = (row.jsonString("TIME_LOCK")).toInt(),
-      eltooAddress = row.jsonString("ELTOO_ADDRESS"),
-      updatedAt = Date.parse(row.jsonString("UPDATED_AT")).toLong()
+      id = row.jsonString("ID")!!.toInt(),
+      sequenceNumber = row.jsonString("SEQUENCE_NUMBER")!!.toInt(),
+      status = row.jsonString("STATUS")!!,
+      myBalance = row.jsonString("MY_BALANCE")!!.toBigDecimal(),
+      counterPartyBalance = row.jsonString("OTHER_BALANCE")!!.toBigDecimal(),
+      myAddress = row.jsonString("MY_ADDRESS")!!,
+      myTriggerKey = row.jsonString("MY_TRIGGER_KEY")!!,
+      myUpdateKey = row.jsonString("MY_UPDATE_KEY")!!,
+      mySettleKey = row.jsonString("MY_SETTLE_KEY")!!,
+      counterPartyAddress = row.jsonString("OTHER_ADDRESS")!!,
+      counterPartyTriggerKey = row.jsonString("OTHER_TRIGGER_KEY")!!,
+      counterPartyUpdateKey = row.jsonString("OTHER_UPDATE_KEY")!!,
+      counterPartySettleKey = row.jsonString("OTHER_SETTLE_KEY")!!,
+      triggerTx = row.jsonString("TRIGGER_TX")!!,
+      updateTx = row.jsonString("UPDATE_TX")!!,
+      settlementTx = row.jsonString("SETTLE_TX")!!,
+      timeLock = row.jsonString("TIME_LOCK")!!.toInt(),
+      eltooAddress = row.jsonString("ELTOO_ADDRESS")!!,
+      updatedAt = Date.parse(row.jsonString("UPDATED_AT")!!).toLong()
     )
   }
 }

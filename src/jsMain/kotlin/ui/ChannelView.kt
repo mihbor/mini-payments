@@ -2,8 +2,8 @@ package ui
 
 import ChannelState
 import androidx.compose.runtime.Composable
-import blockNumber
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
+import logic.blockNumber
 import ltd.mbor.minimak.Balance
 import ltd.mbor.minimak.Coin
 import org.jetbrains.compose.web.dom.Br

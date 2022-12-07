@@ -4,12 +4,12 @@ import ChannelState
 import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import kotlinx.coroutines.launch
+import logic.request
+import logic.send
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Text
-import requestViaChannel
 import scope
-import sendViaChannel
 
 @Composable
 fun ChannelTransfers(channel: ChannelState) {
@@ -20,7 +20,7 @@ fun ChannelTransfers(channel: ChannelState) {
     Button({
       onClick {
         scope.launch {
-          sendViaChannel(amount, channel)
+          channel.send(amount)
         }
       }
     }) {
@@ -34,7 +34,7 @@ fun ChannelTransfers(channel: ChannelState) {
     Button({
       onClick {
         scope.launch {
-          requestViaChannel(amount, channel)
+          channel.request(amount)
         }
       }
     }) {

@@ -2,45 +2,35 @@ package ui
 
 import ChannelState
 import androidx.compose.runtime.*
-import channelKey
-import eltooScript
-import eltooScriptAddress
-import eltooScriptCoins
-import joinChannel
 import kotlinx.browser.document
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
+import logic.*
 import ltd.mbor.minimak.*
-import multisigScriptAddress
-import multisigScriptBalances
-import newKeys
-import newTxId
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Text
 import org.w3c.dom.HTMLCanvasElement
 import scope
-import signAndExportTx
-import subscribe
-import triggerScript
-import update
 
 @Composable
 fun RequestChannel() {
+  var myAddress by remember { mutableStateOf("") }
   var myTriggerKey by remember { mutableStateOf("") }
   var myUpdateKey by remember { mutableStateOf("") }
   var mySettleKey by remember { mutableStateOf("") }
+  var counterPartyAddress by remember { mutableStateOf("") }
   var otherTriggerKey by remember { mutableStateOf("") }
   var otherUpdateKey by remember { mutableStateOf("") }
   var otherSettleKey by remember { mutableStateOf("") }
+  var timeLock by remember { mutableStateOf(10) }
+  
   var triggerTxStatus by remember { mutableStateOf("") }
   var updateTxStatus by remember { mutableStateOf("") }
   var settlementTxStatus by remember { mutableStateOf("") }
-  var timeLock by remember { mutableStateOf(10) }
-  var myAddress by remember { mutableStateOf("") }
-  var counterPartyAddress by remember { mutableStateOf("") }
+  
   var channel by remember { mutableStateOf<ChannelState?>(null) }
   
   LaunchedEffect ("requestChannel")  {

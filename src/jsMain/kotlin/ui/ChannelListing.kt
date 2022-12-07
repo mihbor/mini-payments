@@ -5,11 +5,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
-import balances
-import blockNumber
-import eltooScriptCoins
-import getChannels
 import kotlinx.coroutines.launch
+import logic.balances
+import logic.blockNumber
+import logic.eltooScriptCoins
+import logic.getChannels
 import ltd.mbor.minimak.MDS
 import ltd.mbor.minimak.getCoins
 import org.jetbrains.compose.web.dom.*

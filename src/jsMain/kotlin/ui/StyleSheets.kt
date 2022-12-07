@@ -8,4 +8,9 @@ object StyleSheets : StyleSheet() {
     borderRadius(10.px)
     padding(10.px)
   }
+  val clickable by style {
+    hover(self) style {
+      cursor("pointer")
+    }
+  }
 }

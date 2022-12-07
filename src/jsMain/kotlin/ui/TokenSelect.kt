@@ -2,7 +2,7 @@ package ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
-import balances
+import logic.balances
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.attributes.selected
 import org.jetbrains.compose.web.dom.Option

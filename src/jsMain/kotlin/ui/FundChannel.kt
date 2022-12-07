@@ -2,54 +2,46 @@ package ui
 
 import ChannelState
 import androidx.compose.runtime.*
-import channelKey
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
-import commitFundChannel
-import eltooScript
-import eltooScriptAddress
-import eltooScriptCoins
 import externals.QrScanner
-import fundingTx
 import kotlinx.browser.document
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import ltd.mbor.minimak.*
-import multisigScriptAddress
-import multisigScriptBalances
-import newKeys
-import newTxId
+import logic.*
+import ltd.mbor.minimak.MDS
+import ltd.mbor.minimak.deployScript
+import ltd.mbor.minimak.getAddress
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.HTMLVideoElement
-import prepareFundChannel
 import scope
-import signFloatingTx
-import subscribe
-import triggerScript
-import update
 
 @Composable
 fun FundChannel() {
-  var showFundScanner by remember { mutableStateOf(true) }
   var amount by remember { mutableStateOf(ZERO) }
   var tokenId by remember { mutableStateOf("0x00") }
-  var timeLock by remember { mutableStateOf(10) }
+  
+  var myAddress by remember { mutableStateOf("") }
   var myTriggerKey by remember { mutableStateOf("") }
   var myUpdateKey by remember { mutableStateOf("") }
   var mySettleKey by remember { mutableStateOf("") }
+  var counterPartyAddress by remember { mutableStateOf("") }
   var otherTriggerKey by remember { mutableStateOf("") }
   var otherUpdateKey by remember { mutableStateOf("") }
   var otherSettleKey by remember { mutableStateOf("") }
-  var qrScanner: QrScanner? by remember { mutableStateOf(null) }
+  var timeLock by remember { mutableStateOf(10) }
+  
   var fundingTxStatus by remember { mutableStateOf("") }
   var triggerTxStatus by remember { mutableStateOf("") }
   var updateTxStatus by remember { mutableStateOf("") }
   var settlementTxStatus by remember { mutableStateOf("") }
-  var myAddress by remember { mutableStateOf("") }
-  var counterPartyAddress by remember { mutableStateOf("") }
+  
+  var showFundScanner by remember { mutableStateOf(false) }
+  var qrScanner: QrScanner? by remember { mutableStateOf(null) }
+  
   var channel by remember { mutableStateOf<ChannelState?>(null) }
   
   LaunchedEffect("fundChannel") {
@@ -76,7 +68,7 @@ fun FundChannel() {
         otherTriggerKey = it.value
       }
       style {
-        width(400.px)
+        width(500.px)
       }
     }
     Br()
@@ -86,7 +78,7 @@ fun FundChannel() {
         otherUpdateKey = it.value
       }
       style {
-        width(400.px)
+        width(500.px)
       }
     }
     Br()
@@ -96,7 +88,7 @@ fun FundChannel() {
         otherSettleKey = it.value
       }
       style {
-        width(400.px)
+        width(500.px)
       }
     }
     Br()
@@ -153,13 +145,11 @@ fun FundChannel() {
           triggerTxStatus = "Trigger transaction created, signed"
           val (settlementTxId, _) = signFloatingTx(mySettleKey, eltooScriptAddress, myAddress, triggerTx, mapOf(99 to "0"))
           settlementTxStatus = "Settlement transaction created, signed"
-          val exportedTriggerTx = MDS.exportTx(triggerTxId)
-          val exportedSettlementTx = MDS.exportTx(settlementTxId)
           channel = prepareFundChannel(
             myTriggerKey, myUpdateKey, mySettleKey,
             otherTriggerKey, otherUpdateKey, otherSettleKey,
             myAddress, multisigScriptAddress, eltooScriptAddress,
-            exportedTriggerTx, exportedSettlementTx, amount, timeLock
+            triggerTxId, settlementTxId, amount, timeLock
           )
           console.log("channelId", channel!!.id)
           triggerTxStatus += ", sent"
@@ -175,11 +165,9 @@ fun FundChannel() {
             } else {
               val (address, triggerTx, settlementTx) = splits
               counterPartyAddress = address
-              MDS.importTx(newTxId(), triggerTx)
               triggerTxStatus += ", received back"
-              MDS.importTx(newTxId(), settlementTx)
               settlementTxStatus += ", received back"
-              channel = commitFundChannel(channel!!, fundingTxId, "auto", counterPartyAddress, triggerTx, settlementTx)
+              channel = channel!!.commitFund(fundingTxId, "auto", counterPartyAddress, triggerTx, settlementTx)
               fundingTxStatus += ", signed and posted!"
             }
           }.onCompletion {
@@ -190,6 +178,17 @@ fun FundChannel() {
     }) {
       Text("Initiate!")
     }
+  }
+  Br()
+  Button({
+    onClick {
+      showFundScanner = !showFundScanner
+    }
+    style {
+      if (showFundScanner) border(style = LineStyle.Inset)
+    }
+  }) {
+    Text("Scan QR code")
   }
   Br()
   if (showFundScanner) {

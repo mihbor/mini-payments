@@ -2,16 +2,16 @@ package ui
 
 import ChannelState
 import androidx.compose.runtime.*
-import completeSettlement
 import kotlinx.coroutines.launch
+import logic.completeSettlement
+import logic.postUpdate
+import logic.triggerSettlement
 import ltd.mbor.minimak.Coin
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Text
-import postUpdate
 import scope
-import triggerSettlement
 
 @Composable
 fun Settlement(channel: ChannelState, blockNumber: Int, eltooScriptCoins: List<Coin>, updateChannel: (ChannelState) -> Unit) {

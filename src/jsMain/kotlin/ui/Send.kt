@@ -1,13 +1,13 @@
 package ui
 
 import androidx.compose.runtime.*
-import balances
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import externals.QrScanner
-import isPaymentChannelAvailable
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
+import logic.balances
+import logic.isPaymentChannelAvailable
 import ltd.mbor.minimak.MDS
 import ltd.mbor.minimak.send
 import org.jetbrains.compose.web.attributes.disabled

@@ -5,10 +5,8 @@ import kotlinx.browser.document
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.css.Color.black
 import org.jetbrains.compose.web.css.Color.white
-import org.jetbrains.compose.web.dom.Div
-import org.jetbrains.compose.web.dom.Hr
-import org.jetbrains.compose.web.dom.Span
-import org.jetbrains.compose.web.dom.Text
+import org.jetbrains.compose.web.css.LineStyle.Companion.Solid
+import org.jetbrains.compose.web.dom.*
 import org.w3c.dom.Element
 import org.w3c.dom.HTMLElement
 import org.w3c.dom.events.Event
@@ -20,23 +18,33 @@ tailrec fun Element?.itOrAncestorMatches(predicate: (HTMLElement) -> Boolean): B
 }
 
 @Composable
-fun Menu(setView: (String) -> Unit) {
+fun Menu(view: String, setView: (String) -> Unit) {
   var showMenu by remember { mutableStateOf(false) }
   val dismissMenu: (Event) -> Unit = { event ->
     if(!(event.target as? HTMLElement).itOrAncestorMatches { it.id == "menu" }) {
       showMenu = false
     }
   }
-  Div{
+  H2({
+    style {
+      margin(0.px)
+    }
+  }) {
     Span({
+      classes(StyleSheets.clickable)
       onClick {
         showMenu = !showMenu
       }
+      style {
+        marginRight(5.px)
+        padding(2.px)
+      }
     }) {
-      Text("☰")
+      Text("☰ ")
     }
-    Text("MiniPay")
+    Text(view)
   }
+  Hr()
   if (showMenu) {
     DisposableEffect("menu") {
       document.addEventListener("click", dismissMenu)
@@ -49,16 +57,17 @@ fun Menu(setView: (String) -> Unit) {
       style {
         padding(10.px)
         backgroundColor(white)
-        border(1.px, LineStyle.Solid, black)
+        border(1.px, Solid, black)
         position(Position.Fixed)
-        top(30.px)
+        top(40.px)
         left(0.px)
         property("z-index", 1)
       }
     }) {
       Div({
+        classes(StyleSheets.clickable)
         onClick {
-          setView("receive")
+          setView("Receive")
           showMenu = false
         }
       }) {
@@ -66,8 +75,9 @@ fun Menu(setView: (String) -> Unit) {
       }
       Hr()
       Div({
+        classes(StyleSheets.clickable)
         onClick {
-          setView("send")
+          setView("Send")
           showMenu = false
         }
       }) {
@@ -75,8 +85,9 @@ fun Menu(setView: (String) -> Unit) {
       }
       Hr()
       Div({
+        classes(StyleSheets.clickable)
         onClick {
-          setView("request channel")
+          setView("Request channel")
           showMenu = false
         }
       }) {
@@ -84,8 +95,9 @@ fun Menu(setView: (String) -> Unit) {
       }
       Hr()
       Div({
+        classes(StyleSheets.clickable)
         onClick {
-          setView("fund channel")
+          setView("Fund channel")
           showMenu = false
         }
       }) {
@@ -93,8 +105,9 @@ fun Menu(setView: (String) -> Unit) {
       }
       Hr()
       Div({
+        classes(StyleSheets.clickable)
         onClick {
-          setView("channels")
+          setView("Channels")
           showMenu = false
         }
       }) {
@@ -102,8 +115,9 @@ fun Menu(setView: (String) -> Unit) {
       }
       Hr()
       Div({
+        classes(StyleSheets.clickable)
         onClick {
-          setView("settings")
+          setView("Settings")
           showMenu = false
         }
       }) {

@@ -1,10 +1,10 @@
 package ui
 
 import androidx.compose.runtime.*
-import balances
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.browser.document
 import kotlinx.browser.window
+import logic.balances
 import ltd.mbor.minimak.MDS
 import ltd.mbor.minimak.getAddress
 import org.jetbrains.compose.web.dom.Br

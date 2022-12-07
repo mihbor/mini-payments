@@ -1,7 +1,7 @@
 package ui
 
 import androidx.compose.runtime.Composable
-import getParams
+import logic.getParams
 import org.jetbrains.compose.web.dom.A
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Text

@@ -6,22 +6,21 @@ import kotlinx.browser.document
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonArray
 import logic.*
-import ltd.mbor.minimak.*
+import logic.JoinChannelEvent.*
+import org.jetbrains.compose.web.css.px
+import org.jetbrains.compose.web.css.width
 import org.jetbrains.compose.web.dom.Br
+import org.jetbrains.compose.web.dom.Progress
 import org.jetbrains.compose.web.dom.Text
 import org.w3c.dom.HTMLCanvasElement
 import scope
 
 @Composable
 fun RequestChannel() {
-  var myAddress by remember { mutableStateOf("") }
   var myTriggerKey by remember { mutableStateOf("") }
   var myUpdateKey by remember { mutableStateOf("") }
   var mySettleKey by remember { mutableStateOf("") }
-  var counterPartyAddress by remember { mutableStateOf("") }
   var otherTriggerKey by remember { mutableStateOf("") }
   var otherUpdateKey by remember { mutableStateOf("") }
   var otherSettleKey by remember { mutableStateOf("") }
@@ -30,6 +29,8 @@ fun RequestChannel() {
   var triggerTxStatus by remember { mutableStateOf("") }
   var updateTxStatus by remember { mutableStateOf("") }
   var settlementTxStatus by remember { mutableStateOf("") }
+  
+  var progressStep: Int by remember { mutableStateOf(0) }
   
   var channel by remember { mutableStateOf<ChannelState?>(null) }
   
@@ -61,30 +62,25 @@ fun RequestChannel() {
             otherSettleKey = splits[3]
             val triggerTx = splits[4]
             val settlementTx = splits[5]
-            multisigScriptAddress = MDS.deployScript(triggerScript(otherTriggerKey, myTriggerKey))
-            eltooScriptAddress = MDS.deployScript(eltooScript(timeLock, otherUpdateKey, myUpdateKey, otherSettleKey, mySettleKey))
-            newTxId().also { triggerTxId ->
-              val outputs = MDS.importTx(triggerTxId, triggerTx)["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Coin>(it) }
-              val amount = outputs.find { it.address == eltooScriptAddress }!!.amount
-              val tokenId = outputs.find { it.address == eltooScriptAddress }!!.tokenId
-              val signedTriggerTx = signAndExportTx(triggerTxId, myTriggerKey)
-              triggerTxStatus = "Trigger transaction received, signed"
-              newTxId().also { settlementTxId ->
-                MDS.importTx(settlementTxId, settlementTx).also {
-                  val output = json.decodeFromJsonElement<Coin>(it["outputs"]!!.jsonArray.first())
-                  counterPartyAddress = output.miniAddress
+            triggerTxStatus = "Trigger transaction received"
+            settlementTxStatus = "Settlement transaction received"
+            progressStep++
+            
+            channel = joinChannel(
+              myTriggerKey, myUpdateKey, mySettleKey,
+              otherTriggerKey, otherUpdateKey, otherSettleKey,
+              triggerTx, settlementTx,
+              timeLock
+            ) {
+              progressStep++
+              when (it) {
+                TRIGGER_TX_SIGNED -> triggerTxStatus += " and signed"
+                SETTLEMENT_TX_SIGNED -> settlementTxStatus += " and signed"
+                CHANNEL_PUBLISHED -> {
+                  triggerTxStatus += " and sent back."
+                  settlementTxStatus += " and sent back."
                 }
-                val signedSettlementTx = signAndExportTx(settlementTxId, mySettleKey)
-                settlementTxStatus = "Settlement transaction received, signed"
-                myAddress = MDS.getAddress()
-                channel = joinChannel(
-                  myTriggerKey, myUpdateKey, mySettleKey,
-                  otherTriggerKey, otherUpdateKey, otherSettleKey,
-                  myAddress, counterPartyAddress, multisigScriptAddress, eltooScriptAddress,
-                  signedTriggerTx, signedSettlementTx, amount, tokenId, timeLock
-                )
-                triggerTxStatus += ", sent back"
-                settlementTxStatus += ", sent back"
+                else -> {}
               }
             }
           }
@@ -95,6 +91,16 @@ fun RequestChannel() {
     };Unit
   }
   Br()
+  if (progressStep > 0) {
+    Progress({
+      attr("value", progressStep.toString())
+      attr("max", 6.toString())
+      style {
+        width(500.px)
+      }
+    })
+    Br()
+  }
   if (triggerTxStatus.isEmpty()) {
     Text("Trigger key: $myTriggerKey")
     Br()

@@ -173,8 +173,8 @@ fun FundChannel() {
             } else {
               val (address, triggerTx, settlementTx) = splits
               counterPartyAddress = address
-              triggerTxStatus += ", received back"
-              settlementTxStatus += ", received back"
+              triggerTxStatus += " and received back."
+              settlementTxStatus += " and received back."
               progressStep++
               channel = channel!!.commitFund(fundingTxId, "auto", counterPartyAddress, triggerTx, settlementTx)
               fundingTxStatus += ", signed and posted!"

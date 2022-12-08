@@ -1,4 +1,4 @@
-rootProject.name = "mini-payments"
+rootProject.name = "mini-pay"
 
 pluginManagement {
   repositories {

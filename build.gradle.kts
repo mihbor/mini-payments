@@ -1,6 +1,5 @@
 val ktorVersion = "2.1.2"
 val bignumVersion = "0.3.7"
-val firebaseSdkVersion = "1.6.2"
 
 plugins {
   kotlin("multiplatform") version "1.7.20"
@@ -41,8 +40,8 @@ kotlin {
 
         implementation("com.ionspin.kotlin:bignum:$bignumVersion")
         implementation("com.ionspin.kotlin:bignum-serialization-kotlinx:$bignumVersion")
-  
-        implementation("dev.gitlive:firebase-firestore-js:$firebaseSdkVersion")
+
+        implementation("dev.gitlive:firebase-firestore-js:1.6.2")
 
         implementation("ltd.mbor:minimak:0.1-SNAPSHOT")
 

@@ -18,7 +18,10 @@ fun ChannelView(
 ) {
   Br()
   multisigScriptBalances.forEach {
-    Text("[${it.tokenId}] token funding balance: ${it.confirmed.toPlainString()}")
+    it.tokenUrl?.let{
+      TokenIcon(it)
+    }
+    Text("[${it.tokenName}] token funding balance: ${it.confirmed.toPlainString()}")
     Br()
   }
   if (multisigScriptBalances.any { it.unconfirmed > ZERO || it.confirmed > ZERO }) {

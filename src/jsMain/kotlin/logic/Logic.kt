@@ -75,10 +75,8 @@ suspend fun init(uid: String?) {
         blockNumber = msg.jsonObject["data"]!!.jsonObject["txpow"]!!.jsonObject["header"]!!.jsonString("block")!!.toInt()
         if (multisigScriptAddress.isNotEmpty()) {
           scope.launch {
-            val newBalances = MDS.getBalances(multisigScriptAddress)
-            if (newBalances.any { it.unconfirmed > ZERO || it.confirmed > ZERO }
-              && multisigScriptBalances.none { it.unconfirmed > ZERO || it.confirmed > ZERO }
-            ) {
+            val newBalances = MDS.getBalances(multisigScriptAddress, confirmations = 0)
+            if (newBalances.any { it.confirmed > ZERO } && multisigScriptBalances.none { it.confirmed > ZERO }) {
               setChannelOpen(multisigScriptAddress)
             }
             multisigScriptBalances.clear()

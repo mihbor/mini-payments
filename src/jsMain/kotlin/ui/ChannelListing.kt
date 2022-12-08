@@ -72,7 +72,7 @@ suspend fun loadChannels(channels: MutableList<ChannelState>) {
   val newChannels = getChannels()
   channels.clear()
   channels.addAll(newChannels)
-  newChannels.forEach {
+  newChannels.filter{ it.eltooAddress.isNotBlank() }.forEach {
     eltooScriptCoins.put(it.eltooAddress, MDS.getCoins(address = it.eltooAddress))
   }
 }

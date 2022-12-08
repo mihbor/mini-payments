@@ -46,6 +46,7 @@ suspend fun getChannels(status: String? = null): List<ChannelState> {
       id = row.jsonString("ID")!!.toInt(),
       sequenceNumber = row.jsonString("SEQUENCE_NUMBER")!!.toInt(),
       status = row.jsonString("STATUS")!!,
+      tokenId = row.jsonString("TOKEN_ID")!!,
       myBalance = row.jsonString("MY_BALANCE")!!.toBigDecimal(),
       counterPartyBalance = row.jsonString("OTHER_BALANCE")!!.toBigDecimal(),
       myAddress = row.jsonString("MY_ADDRESS")!!,

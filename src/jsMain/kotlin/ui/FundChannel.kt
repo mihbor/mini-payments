@@ -10,9 +10,7 @@ import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import logic.*
-import ltd.mbor.minimak.MDS
-import ltd.mbor.minimak.deployScript
-import ltd.mbor.minimak.getAddress
+import logic.FundChannelEvent.*
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
@@ -24,7 +22,6 @@ fun FundChannel() {
   var amount by remember { mutableStateOf(ZERO) }
   var tokenId by remember { mutableStateOf("0x00") }
   
-  var myAddress by remember { mutableStateOf("") }
   var myTriggerKey by remember { mutableStateOf("") }
   var myUpdateKey by remember { mutableStateOf("") }
   var mySettleKey by remember { mutableStateOf("") }
@@ -41,6 +38,7 @@ fun FundChannel() {
   
   var showFundScanner by remember { mutableStateOf(false) }
   var qrScanner: QrScanner? by remember { mutableStateOf(null) }
+  var progressStep: Int by remember { mutableStateOf(0) }
   
   var channel by remember { mutableStateOf<ChannelState?>(null) }
   
@@ -55,6 +53,16 @@ fun FundChannel() {
     settlementTxStatus = ""
   }
   Br()
+  if (progressStep > 0) {
+    Progress({
+      attr("value", progressStep.toString())
+      attr("max", 8.toString())
+      style {
+        width(500.px)
+      }
+    })
+    Br()
+  }
   if (fundingTxStatus.isEmpty()) {
     Text("My trigger key: $myTriggerKey")
     Br()
@@ -135,25 +143,25 @@ fun FundChannel() {
         showFundScanner = false
         qrScanner?.stop()
         scope.launch {
-          multisigScriptAddress = MDS.deployScript(triggerScript(myTriggerKey, otherTriggerKey))
-          eltooScriptAddress = MDS.deployScript(eltooScript(timeLock, myUpdateKey, otherUpdateKey, mySettleKey, otherSettleKey))
-          console.log("multisig address (fund)", multisigScriptAddress)
-          val (fundingTxId, fundingTx) = fundingTx(multisigScriptAddress, amount, tokenId)
-          fundingTxStatus = "Funding transaction created"
-          myAddress = MDS.getAddress()
-          val (triggerTxId, triggerTx) = signFloatingTx(myTriggerKey, multisigScriptAddress, eltooScriptAddress, fundingTx, mapOf(99 to "0"))
-          triggerTxStatus = "Trigger transaction created, signed"
-          val (settlementTxId, _) = signFloatingTx(mySettleKey, eltooScriptAddress, myAddress, triggerTx, mapOf(99 to "0"))
-          settlementTxStatus = "Settlement transaction created, signed"
-          channel = prepareFundChannel(
+          val (channelNotPosted, fundingTxId) = prepareFundChannel(
             myTriggerKey, myUpdateKey, mySettleKey,
             otherTriggerKey, otherUpdateKey, otherSettleKey,
-            myAddress, multisigScriptAddress, eltooScriptAddress,
-            triggerTxId, settlementTxId, amount, timeLock
-          )
+            amount, tokenId, timeLock
+          ) {
+            progressStep++
+            when(it) {
+              FUNDING_TX_CREATED -> fundingTxStatus = "Funding transaction created"
+              TRIGGER_TX_SIGNED -> triggerTxStatus = "Trigger transaction created and signed"
+              SETTLEMENT_TX_SIGNED -> settlementTxStatus = "Settlement transaction created and signed"
+              CHANNEL_PUBLISHED -> {
+                triggerTxStatus += ", sent"
+                settlementTxStatus += ", sent"
+              }
+              else -> {}
+            }
+          }
+          channel = channelNotPosted
           console.log("channelId", channel!!.id)
-          triggerTxStatus += ", sent"
-          settlementTxStatus += ", sent"
         
           console.log("subscribing to", "$myTriggerKey;$myUpdateKey;$mySettleKey")
           subscribe(channelKey(myTriggerKey, myUpdateKey, mySettleKey)).onEach { msg ->
@@ -167,8 +175,10 @@ fun FundChannel() {
               counterPartyAddress = address
               triggerTxStatus += ", received back"
               settlementTxStatus += ", received back"
+              progressStep++
               channel = channel!!.commitFund(fundingTxId, "auto", counterPartyAddress, triggerTx, settlementTx)
               fundingTxStatus += ", signed and posted!"
+              progressStep++
             }
           }.onCompletion {
             console.log("completed")

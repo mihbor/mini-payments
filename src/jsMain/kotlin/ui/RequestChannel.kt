@@ -66,6 +66,7 @@ fun RequestChannel() {
             newTxId().also { triggerTxId ->
               val outputs = MDS.importTx(triggerTxId, triggerTx)["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Coin>(it) }
               val amount = outputs.find { it.address == eltooScriptAddress }!!.amount
+              val tokenId = outputs.find { it.address == eltooScriptAddress }!!.tokenId
               val signedTriggerTx = signAndExportTx(triggerTxId, myTriggerKey)
               triggerTxStatus = "Trigger transaction received, signed"
               newTxId().also { settlementTxId ->
@@ -80,7 +81,7 @@ fun RequestChannel() {
                   myTriggerKey, myUpdateKey, mySettleKey,
                   otherTriggerKey, otherUpdateKey, otherSettleKey,
                   myAddress, counterPartyAddress, multisigScriptAddress, eltooScriptAddress,
-                  signedTriggerTx, signedSettlementTx, amount, timeLock
+                  signedTriggerTx, signedSettlementTx, amount, tokenId, timeLock
                 )
                 triggerTxStatus += ", sent back"
                 settlementTxStatus += ", sent back"

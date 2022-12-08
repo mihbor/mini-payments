@@ -19,7 +19,6 @@ fun Settlement(channel: ChannelState, blockNumber: Int, eltooScriptCoins: List<C
   var settlementTriggering by remember { mutableStateOf(false) }
   var updatePosting by remember { mutableStateOf(false) }
   var settlementCompleting by remember { mutableStateOf(false) }
-  console.log("Channel status", channel.status)
 
   if (channel.status == "OPEN") {
     Button({

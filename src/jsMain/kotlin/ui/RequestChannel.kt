@@ -1,6 +1,6 @@
 package ui
 
-import ChannelState
+import Channel
 import androidx.compose.runtime.*
 import kotlinx.browser.document
 import kotlinx.coroutines.flow.launchIn
@@ -18,12 +18,8 @@ import scope
 
 @Composable
 fun RequestChannel() {
-  var myTriggerKey by remember { mutableStateOf("") }
-  var myUpdateKey by remember { mutableStateOf("") }
-  var mySettleKey by remember { mutableStateOf("") }
-  var otherTriggerKey by remember { mutableStateOf("") }
-  var otherUpdateKey by remember { mutableStateOf("") }
-  var otherSettleKey by remember { mutableStateOf("") }
+  var myKeys by remember { mutableStateOf(Channel.Keys("", "", "")) }
+  var theirKeys by remember { mutableStateOf(Channel.Keys("", "", "")) }
   var timeLock by remember { mutableStateOf(10) }
   
   var triggerTxStatus by remember { mutableStateOf("") }
@@ -32,24 +28,21 @@ fun RequestChannel() {
   
   var progressStep: Int by remember { mutableStateOf(0) }
   
-  var channel by remember { mutableStateOf<ChannelState?>(null) }
+  var channel by remember { mutableStateOf<Channel?>(null) }
   
   LaunchedEffect ("requestChannel")  {
     newKeys(3).apply {
-      myTriggerKey = this[0]
-      myUpdateKey = this[1]
-      mySettleKey = this[2]
+      myKeys = Channel.Keys(this[0], this[1], this[2])
     }
     triggerTxStatus = ""
     settlementTxStatus = ""
     val canvas = document.getElementById("joinChannelQR") as HTMLCanvasElement
     QRCode.toCanvas(
-      canvas, "$myTriggerKey;$myUpdateKey;$mySettleKey"
+      canvas, channelKey(myKeys)
     ) { error ->
       if (error != null) console.error(error)
       else {
-        console.log("qr generated, subscribing to $myTriggerKey;$myUpdateKey;$mySettleKey")
-        subscribe(channelKey(myTriggerKey, myUpdateKey, mySettleKey)).onEach { msg ->
+        subscribe(myKeys).onEach { msg ->
           console.log("tx msg", msg)
           val splits = msg.split(";")
           if (splits[0].startsWith("TXN_UPDATE")) {
@@ -57,21 +50,14 @@ fun RequestChannel() {
             updateTxStatus += "Update transaction ${if (splits[0].endsWith("ACK")) "ack " else ""}received. "
           } else {
             timeLock = splits[0].toInt()
-            otherTriggerKey = splits[1]
-            otherUpdateKey = splits[2]
-            otherSettleKey = splits[3]
+            theirKeys = Channel.Keys(splits[1], splits[2], splits[3])
             val triggerTx = splits[4]
             val settlementTx = splits[5]
             triggerTxStatus = "Trigger transaction received"
             settlementTxStatus = "Settlement transaction received"
             progressStep++
             
-            channel = joinChannel(
-              myTriggerKey, myUpdateKey, mySettleKey,
-              otherTriggerKey, otherUpdateKey, otherSettleKey,
-              triggerTx, settlementTx,
-              timeLock
-            ) {
+            channel = joinChannel(myKeys, theirKeys, triggerTx, settlementTx, timeLock) {
               progressStep++
               when (it) {
                 TRIGGER_TX_SIGNED -> triggerTxStatus += " and signed"
@@ -102,11 +88,11 @@ fun RequestChannel() {
     Br()
   }
   if (triggerTxStatus.isEmpty()) {
-    Text("Trigger key: $myTriggerKey")
+    Text("Trigger key: ${myKeys.trigger}")
     Br()
-    Text("Update key: $myUpdateKey")
+    Text("Update key: ${myKeys.update}")
     Br()
-    Text("Settlement key: $mySettleKey")
+    Text("Settlement key: ${myKeys.settle}")
     Br()
   }
   triggerTxStatus.takeUnless { it.isEmpty() }?.let {

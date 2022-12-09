@@ -59,7 +59,7 @@ suspend fun init(uid: String?) {
           balances.putAll(MDS.getBalances().associateBy { it.tokenId })
           createDB()
           getChannels(status = "OPEN").forEach {
-            subscribe(channelKey(it.myTriggerKey, it.myUpdateKey, it.mySettleKey), from = it.updatedAt).onEach { msg ->
+            subscribe(it.my.keys, from = it.updatedAt).onEach { msg ->
               console.log("tx msg", msg)
               val splits = msg.split(";")
               if (splits[0].startsWith("TXN_UPDATE")) {

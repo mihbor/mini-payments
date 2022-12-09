@@ -1,10 +1,9 @@
 package logic
 
-import ChannelState
+import Channel
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import logic.JoinChannelEvent.*
 import ltd.mbor.minimak.*
 import kotlin.js.Date
@@ -15,74 +14,55 @@ enum class JoinChannelEvent{
 }
 
 suspend fun joinChannel(
-  myTriggerKey: String,
-  myUpdateKey: String,
-  mySettleKey: String,
-  otherTriggerKey: String,
-  otherUpdateKey: String,
-  otherSettleKey: String,
+  myKeys: Channel.Keys,
+  theirKeys: Channel.Keys,
   triggerTx: String,
   settlementTx: String,
   timeLock: Int,
   event: (JoinChannelEvent) -> Unit = {}
-): ChannelState {
+): Channel {
   val myAddress = MDS.getAddress()
-  multisigScriptAddress = MDS.deployScript(triggerScript(otherTriggerKey, myTriggerKey))
-  eltooScriptAddress = MDS.deployScript(eltooScript(timeLock, otherUpdateKey, myUpdateKey, otherSettleKey, mySettleKey))
+  multisigScriptAddress = MDS.deployScript(triggerScript(theirKeys.trigger, myKeys.trigger))
+  eltooScriptAddress = MDS.deployScript(eltooScript(timeLock, theirKeys.update, myKeys.update, theirKeys.settle, myKeys.settle))
   event(SCRIPTS_DEPLOYED)
   
   val triggerTxId = newTxId()
   val outputs = MDS.importTx(triggerTxId, triggerTx)["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Coin>(it) }
   val (amount, tokenId) = outputs.find { it.address == eltooScriptAddress }!!.let { it.tokenAmount to it.tokenId }
-  val signedTriggerTx = signAndExportTx(triggerTxId, myTriggerKey)
+  val signedTriggerTx = signAndExportTx(triggerTxId, myKeys.trigger)
   event(TRIGGER_TX_SIGNED)
   
   val settlementTxId = newTxId()
   val importedSettlementTx = MDS.importTx(settlementTxId, settlementTx)
   val output = json.decodeFromJsonElement<Coin>(importedSettlementTx["outputs"]!!.jsonArray.first())
-  val otherAddress = output.miniAddress
-  val signedSettlementTx = signAndExportTx(settlementTxId, mySettleKey)
+  val theirAddress = output.miniAddress
+  val signedSettlementTx = signAndExportTx(settlementTxId, myKeys.settle)
   event(SETTLEMENT_TX_SIGNED)
-  
-  MDS.sql("""INSERT INTO channel(
-      status, sequence_number, token_id, my_balance, other_balance,
-      my_trigger_key, my_update_key, my_settle_key,
-      other_trigger_key, other_update_key, other_settle_key,
-      trigger_tx, update_tx, settle_tx, time_lock,
-      multisig_address, eltoo_address, my_address, other_address
-    ) VALUES (
-      'OFFERED', 0, '$tokenId', 0, ${amount.toPlainString()},
-      '$myTriggerKey', '$myUpdateKey', '$mySettleKey',
-      '$otherTriggerKey', '$otherUpdateKey', '$otherSettleKey',
-      '$signedTriggerTx', '', '$signedSettlementTx', $timeLock,
-      '$multisigScriptAddress', '$eltooScriptAddress', '$myAddress', '$otherAddress'
-    );
-  """)
-  val sql = MDS.sql("SELECT IDENTITY() as ID;")
-  val results = sql!!.jsonObject["rows"]!!.jsonArray
+
+  val channelId = insertChannel(tokenId, amount, myKeys, theirKeys, signedTriggerTx, signedSettlementTx, timeLock, multisigScriptAddress, eltooScriptAddress, myAddress, theirAddress)
   event(CHANNEL_PERSISTED)
 
   publish(
-    channelKey(otherTriggerKey, otherUpdateKey, otherSettleKey),
+    theirKeys,
     listOf(myAddress, signedTriggerTx, signedSettlementTx).joinToString(";")
   )
   event(CHANNEL_PUBLISHED)
 
-  return ChannelState(
-    id = results[0].jsonString("ID")!!.toInt(),
+  return Channel(
+    id = channelId,
     sequenceNumber = 0,
     status = "OFFERED",
     tokenId = tokenId,
-    myBalance = BigDecimal.ZERO,
-    counterPartyBalance = amount,
-    myAddress = myAddress,
-    counterPartyAddress = otherAddress,
-    myTriggerKey = myTriggerKey,
-    myUpdateKey = myUpdateKey,
-    mySettleKey = mySettleKey,
-    counterPartyTriggerKey = otherTriggerKey,
-    counterPartyUpdateKey = otherUpdateKey,
-    counterPartySettleKey = otherSettleKey,
+    my = Channel.Side(
+      balance = BigDecimal.ZERO,
+      address = myAddress,
+      keys = myKeys
+    ),
+    their = Channel.Side(
+      balance = amount,
+      address = theirAddress,
+      keys = theirKeys
+    ),
     triggerTx = signedTriggerTx,
     settlementTx = signedSettlementTx,
     timeLock = timeLock,

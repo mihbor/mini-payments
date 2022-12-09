@@ -1,6 +1,6 @@
 package ui
 
-import ChannelState
+import Channel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
@@ -17,7 +17,7 @@ import scope
 
 @Composable
 fun ChannelListing() {
-  val channels = remember { mutableStateListOf<ChannelState>() }
+  val channels = remember { mutableStateListOf<Channel>() }
 
   LaunchedEffect("channels") { loadChannels(channels) }
   Button({
@@ -49,10 +49,10 @@ fun ChannelListing() {
           Td { Text(channel.sequenceNumber.toString()) }
           Td {
             TokenIcon(channel.tokenId, balances)
-            Text(balances[channel.tokenId]?.tokenName ?: channel.tokenId)
+            Text(balances[channel.tokenId]?.tokenName ?: "[${channel.tokenId}]")
           }
-          Td { Text(channel.myBalance.toPlainString()) }
-          Td { Text(channel.counterPartyBalance.toPlainString()) }
+          Td { Text(channel.my.balance.toPlainString()) }
+          Td { Text(channel.their.balance.toPlainString()) }
           Td {
             if (channel.status == "OPEN") {
               ChannelTransfers(channel)
@@ -68,7 +68,7 @@ fun ChannelListing() {
   }
 }
 
-suspend fun loadChannels(channels: MutableList<ChannelState>) {
+suspend fun loadChannels(channels: MutableList<Channel>) {
   val newChannels = getChannels()
   channels.clear()
   channels.addAll(newChannels)

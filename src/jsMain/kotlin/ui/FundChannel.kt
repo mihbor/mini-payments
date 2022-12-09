@@ -1,6 +1,6 @@
 package ui
 
-import ChannelState
+import Channel
 import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import externals.QrScanner
@@ -22,13 +22,9 @@ fun FundChannel() {
   var amount by remember { mutableStateOf(ZERO) }
   var tokenId by remember { mutableStateOf("0x00") }
   
-  var myTriggerKey by remember { mutableStateOf("") }
-  var myUpdateKey by remember { mutableStateOf("") }
-  var mySettleKey by remember { mutableStateOf("") }
-  var counterPartyAddress by remember { mutableStateOf("") }
-  var otherTriggerKey by remember { mutableStateOf("") }
-  var otherUpdateKey by remember { mutableStateOf("") }
-  var otherSettleKey by remember { mutableStateOf("") }
+  var myKeys by remember { mutableStateOf(Channel.Keys("", "", "")) }
+  var theirKeys by remember { mutableStateOf(Channel.Keys("", "", "")) }
+  var theirAddress by remember { mutableStateOf("") }
   var timeLock by remember { mutableStateOf(10) }
   
   var fundingTxStatus by remember { mutableStateOf("") }
@@ -40,13 +36,11 @@ fun FundChannel() {
   var qrScanner: QrScanner? by remember { mutableStateOf(null) }
   var progressStep: Int by remember { mutableStateOf(0) }
   
-  var channel by remember { mutableStateOf<ChannelState?>(null) }
+  var channel by remember { mutableStateOf<Channel?>(null) }
   
   LaunchedEffect("fundChannel") {
     newKeys(3).apply {
-      myTriggerKey = this[0]
-      myUpdateKey = this[1]
-      mySettleKey = this[2]
+      myKeys = Channel.Keys(this[0], this[1], this[2])
     }
     fundingTxStatus = ""
     triggerTxStatus = ""
@@ -64,16 +58,16 @@ fun FundChannel() {
     Br()
   }
   if (fundingTxStatus.isEmpty()) {
-    Text("My trigger key: $myTriggerKey")
+    Text("My trigger key: ${myKeys.trigger}")
     Br()
-    Text("My update key: $myUpdateKey")
+    Text("My update key: ${myKeys.update}")
     Br()
-    Text("My settlement key: $mySettleKey")
+    Text("My settlement key: ${myKeys.settle}")
     Br()
     Text("Counterparty trigger key:")
-    TextInput(otherTriggerKey) {
+    TextInput(theirKeys.trigger) {
       onInput {
-        otherTriggerKey = it.value
+        theirKeys = theirKeys.copy(trigger = it.value)
       }
       style {
         width(500.px)
@@ -81,9 +75,9 @@ fun FundChannel() {
     }
     Br()
     Text("Counterparty update key:")
-    TextInput(otherUpdateKey) {
+    TextInput(theirKeys.update) {
       onInput {
-        otherUpdateKey = it.value
+        theirKeys = theirKeys.copy(update = it.value)
       }
       style {
         width(500.px)
@@ -91,9 +85,9 @@ fun FundChannel() {
     }
     Br()
     Text("Counterparty settlement key:")
-    TextInput(otherSettleKey) {
+    TextInput(theirKeys.settle) {
       onInput {
-        otherSettleKey = it.value
+        theirKeys = theirKeys.copy(settle = it.value)
       }
       style {
         width(500.px)
@@ -122,7 +116,7 @@ fun FundChannel() {
       channel = it
     }
   }
-  if (listOf(myTriggerKey, mySettleKey, myUpdateKey, otherTriggerKey, otherSettleKey, otherUpdateKey).all(String::isNotEmpty)
+  if (listOf(myKeys.trigger, myKeys.update, myKeys.settle, theirKeys.trigger, theirKeys.update, theirKeys.settle).all(String::isNotEmpty)
     && fundingTxStatus.isEmpty()
   ) {
     DecimalNumberInput(amount, min = ZERO) {
@@ -143,11 +137,7 @@ fun FundChannel() {
         showFundScanner = false
         qrScanner?.stop()
         scope.launch {
-          val (channelNotPosted, fundingTxId) = prepareFundChannel(
-            myTriggerKey, myUpdateKey, mySettleKey,
-            otherTriggerKey, otherUpdateKey, otherSettleKey,
-            amount, tokenId, timeLock
-          ) {
+          val (channelNotPosted, fundingTxId) = prepareFundChannel(myKeys, theirKeys, amount, tokenId, timeLock) {
             progressStep++
             when(it) {
               FUNDING_TX_CREATED -> fundingTxStatus = "Funding transaction created"
@@ -163,8 +153,7 @@ fun FundChannel() {
           channel = channelNotPosted
           console.log("channelId", channel!!.id)
         
-          console.log("subscribing to", "$myTriggerKey;$myUpdateKey;$mySettleKey")
-          subscribe(channelKey(myTriggerKey, myUpdateKey, mySettleKey)).onEach { msg ->
+          subscribe(myKeys).onEach { msg ->
             console.log("tx msg", msg)
             val splits = msg.split(";")
             if (splits[0].startsWith("TXN_UPDATE")) {
@@ -172,11 +161,11 @@ fun FundChannel() {
               updateTxStatus += "Update transaction ${if (splits[0].endsWith("ACK")) "ack " else ""}received. "
             } else {
               val (address, triggerTx, settlementTx) = splits
-              counterPartyAddress = address
+              theirAddress = address
               triggerTxStatus += " and received back."
               settlementTxStatus += " and received back."
               progressStep++
-              channel = channel!!.commitFund(fundingTxId, "auto", counterPartyAddress, triggerTx, settlementTx)
+              channel = channel!!.commitFund(fundingTxId, "auto", theirAddress, triggerTx, settlementTx)
               fundingTxStatus += ", signed and posted!"
               progressStep++
             }
@@ -215,9 +204,7 @@ fun FundChannel() {
       qrScanner = QrScanner(video) { result ->
         console.log("decoded qr code: $result")
         result.split(';').apply {
-          otherTriggerKey = this[0]
-          otherUpdateKey = this[1]
-          otherSettleKey = this[2]
+          theirKeys = Channel.Keys(this[0], this[1], this[2])
         }
         qrScanner!!.stop()
         showFundScanner = false

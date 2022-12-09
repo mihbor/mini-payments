@@ -1,5 +1,6 @@
 package logic
 
+import Channel
 import dev.gitlive.firebase.Firebase
 import dev.gitlive.firebase.FirebaseOptions
 import dev.gitlive.firebase.firestore.firestore
@@ -27,15 +28,17 @@ suspend fun fetch(id: String): String? = (
     .takeIf { it.exists }?.get("tx")
   )
 
-fun subscribe(id: String, from: Long? = null): Flow<String> =
-  Firebase.firestore.collection(COLLECTION).document(id).snapshots.mapNotNull { doc ->
+fun subscribe(keys: Channel.Keys, from: Long? = null): Flow<String> {
+  console.log("subscribing to", channelKey(keys))
+  return Firebase.firestore.collection(COLLECTION).document(channelKey(keys)).snapshots.mapNotNull { doc ->
     if(doc.exists) doc else null
   }.filter{
     from == null || from <= (it.get("timestamp") as? Double ?: 0.0)
   }.mapNotNull {
     it.get("tx")
   }
+}
 
-suspend fun publish(id: String, content: String) {
-  Firebase.firestore.collection(COLLECTION).document(id).set(mapOf("tx" to content, "timestamp" to Date.now()))
+suspend fun publish(keys: Channel.Keys, content: String) {
+  Firebase.firestore.collection(COLLECTION).document(channelKey(keys)).set(mapOf("tx" to content, "timestamp" to Date.now()))
 }

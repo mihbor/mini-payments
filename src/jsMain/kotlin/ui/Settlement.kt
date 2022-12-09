@@ -1,8 +1,9 @@
 package ui
 
-import ChannelState
+import Channel
 import androidx.compose.runtime.*
 import kotlinx.coroutines.launch
+import logic.balances
 import logic.completeSettlement
 import logic.postUpdate
 import logic.triggerSettlement
@@ -14,7 +15,7 @@ import org.jetbrains.compose.web.dom.Text
 import scope
 
 @Composable
-fun Settlement(channel: ChannelState, blockNumber: Int, eltooScriptCoins: List<Coin>, updateChannel: (ChannelState) -> Unit) {
+fun Settlement(channel: Channel, blockNumber: Int, eltooScriptCoins: List<Coin>, updateChannel: (Channel) -> Unit) {
 
   var settlementTriggering by remember { mutableStateOf(false) }
   var updatePosting by remember { mutableStateOf(false) }
@@ -37,7 +38,8 @@ fun Settlement(channel: ChannelState, blockNumber: Int, eltooScriptCoins: List<C
   if (eltooScriptCoins.isNotEmpty()) {
     eltooScriptCoins.forEach {
       Br()
-      Text("[${it.tokenId}] token eltoo coin: ${it.tokenAmount.toPlainString()} timelock ${
+      TokenIcon(it.tokenId, balances)
+      Text("${balances[it.tokenId]?.tokenName ?: "[${it.tokenId}]"} token eltoo coin: ${it.tokenAmount.toPlainString()} timelock ${
         (it.created.toInt() + channel.timeLock - blockNumber).takeIf { it > 0 }?.let { "ends in $it blocks" } ?: "ended"}"
       )
     }

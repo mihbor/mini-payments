@@ -1,8 +1,9 @@
 package ui
 
-import ChannelState
+import Channel
 import androidx.compose.runtime.Composable
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
+import logic.balances
 import logic.blockNumber
 import ltd.mbor.minimak.Balance
 import ltd.mbor.minimak.Coin
@@ -11,21 +12,19 @@ import org.jetbrains.compose.web.dom.Text
 
 @Composable
 fun ChannelView(
-  channel: ChannelState,
+  channel: Channel,
   multisigScriptBalances: List<Balance>,
   eltooScriptCoins: List<Coin>,
-  updateChannel: (ChannelState) -> Unit
+  updateChannel: (Channel) -> Unit
 ) {
   Br()
   multisigScriptBalances.forEach {
-    it.tokenUrl?.let{
-      TokenIcon(it)
-    }
-    Text("[${it.tokenName}] token funding balance: ${it.confirmed.toPlainString()}")
+    TokenIcon(it.tokenId, balances)
+    Text("${it.tokenName} token funding balance: ${it.confirmed.toPlainString()}")
     Br()
   }
   if (multisigScriptBalances.any { it.unconfirmed > ZERO || it.confirmed > ZERO }) {
-    Text("Channel balance: me ${channel.myBalance.toPlainString()}, counterparty ${channel.counterPartyBalance.toPlainString()}")
+    Text("Channel balance: me ${channel.my.balance.toPlainString()}, counterparty ${channel.their.balance.toPlainString()}")
     ChannelTransfers(channel)
     Br()
   }

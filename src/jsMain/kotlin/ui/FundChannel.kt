@@ -5,12 +5,12 @@ import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import externals.QrScanner
 import kotlinx.browser.document
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.onCompletion
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import logic.*
 import logic.FundChannelEvent.*
+import logic.eltooScriptCoins
+import logic.fundChannel
+import logic.multisigScriptBalances
+import logic.newKeys
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
@@ -24,7 +24,6 @@ fun FundChannel() {
   
   var myKeys by remember { mutableStateOf(Channel.Keys("", "", "")) }
   var theirKeys by remember { mutableStateOf(Channel.Keys("", "", "")) }
-  var theirAddress by remember { mutableStateOf("") }
   var timeLock by remember { mutableStateOf(10) }
   
   var fundingTxStatus by remember { mutableStateOf("") }
@@ -137,41 +136,34 @@ fun FundChannel() {
         showFundScanner = false
         qrScanner?.stop()
         scope.launch {
-          val (channelNotPosted, fundingTxId) = prepareFundChannel(myKeys, theirKeys, amount, tokenId, timeLock) {
+          fundChannel(myKeys, theirKeys, amount, tokenId, timeLock) { event, newChannel ->
             progressStep++
-            when(it) {
+            when(event) {
               FUNDING_TX_CREATED -> fundingTxStatus = "Funding transaction created"
               TRIGGER_TX_SIGNED -> triggerTxStatus = "Trigger transaction created and signed"
               SETTLEMENT_TX_SIGNED -> settlementTxStatus = "Settlement transaction created and signed"
               CHANNEL_PUBLISHED -> {
                 triggerTxStatus += ", sent"
                 settlementTxStatus += ", sent"
+                channel = newChannel
+                console.log("channelId", channel!!.id)
+              }
+              SIGS_RECEIVED -> {
+                triggerTxStatus += " and received back."
+                settlementTxStatus += " and received back."
+              }
+              CHANNEL_FUNDED -> fundingTxStatus += ", signed and posted!"
+              CHANNEL_UPDATED -> {
+                channel = newChannel
+                updateTxStatus += "Update transaction received. "
+              }
+              CHANNEL_UPDATED_ACKED -> {
+                channel = newChannel
+                updateTxStatus += "Update transaction ack received. "
               }
               else -> {}
             }
           }
-          channel = channelNotPosted
-          console.log("channelId", channel!!.id)
-        
-          subscribe(myKeys).onEach { msg ->
-            console.log("tx msg", msg)
-            val splits = msg.split(";")
-            if (splits[0].startsWith("TXN_UPDATE")) {
-              channel = channel!!.update(splits[0].endsWith("_ACK"), updateTx = splits[1], settleTx = splits[2])
-              updateTxStatus += "Update transaction ${if (splits[0].endsWith("ACK")) "ack " else ""}received. "
-            } else {
-              val (address, triggerTx, settlementTx) = splits
-              theirAddress = address
-              triggerTxStatus += " and received back."
-              settlementTxStatus += " and received back."
-              progressStep++
-              channel = channel!!.commitFund(fundingTxId, "auto", theirAddress, triggerTx, settlementTx)
-              fundingTxStatus += ", signed and posted!"
-              progressStep++
-            }
-          }.onCompletion {
-            console.log("completed")
-          }.launchIn(scope)
         }
       }
     }) {

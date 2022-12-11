@@ -2,29 +2,17 @@ package logic
 
 import Channel
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
+import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import kotlinx.serialization.json.*
 import ltd.mbor.minimak.*
 
-fun channelKey(keys: Channel.Keys) = listOf(keys.trigger, keys.update, keys.settle).joinToString(";")
+fun channelKey(keys: Channel.Keys, tokenId: String) = listOf(keys.trigger, keys.update, keys.settle, tokenId).joinToString(";")
 
 suspend fun isPaymentChannelAvailable(toAddress: String, tokenId: String, amount: BigDecimal): Boolean {
   val matchingChannels = getChannels(status = "OPEN").filter { channel ->
     channel.their.address == toAddress && channel.tokenId == tokenId && channel.my.balance >= amount
   }
   return matchingChannels.isNotEmpty()
-}
-
-suspend fun fundingTx(toAddress: String, amount: BigDecimal, tokenId: String): Int {
-  val txnId = newTxId()
-  val (inputs, outputs) = MDS.inputsWithChange(tokenId, amount)
-  
-  val txncreator = "txncreate id:$txnId;" +
-    inputs.map{ "txninput id:$txnId coinid:${it.coinId};"}.joinToString("") +
-    "txnoutput id:$txnId amount:${amount.toPlainString()} tokenid:$tokenId address:$toAddress;" +
-    outputs.map{ "txnoutput id:$txnId amount:${it.amount.toPlainString()} tokenid:${it.tokenId} address:${it.address};"}.joinToString("")
-  
-  MDS.cmd(txncreator)
-  return txnId
 }
 
 suspend fun signAndExportTx(id: Int, key: String): String {
@@ -41,22 +29,26 @@ suspend fun importAndPost(tx: String): dynamic {
 suspend fun signFloatingTx(
   myKey: String,
   sourceScriptAddress: String,
-  amount: BigDecimal,
+  states: Map<Int, String> = emptyMap(),
   tokenId: String,
-  targetAddress: String,
-  states: Map<Int, String> = emptyMap()
+  vararg amountToAddress: Pair<BigDecimal, String>
 ): Int {
   
+  val total = amountToAddress.sumOf { it.first }
   val txnId = newTxId()
-  val txncreator = "txncreate id:$txnId;" +
-    "txninput id:$txnId address:${sourceScriptAddress} amount:$amount tokenid:$tokenId floating:true;" +
-    states.mapNotNull { (index, value) -> value.takeUnless { it.isEmpty() }?.let {"txnstate id:$txnId port:$index value:$value;" } }.joinToString("") +
-    "txnoutput id:$txnId amount:${amount} tokenid:$tokenId address:$targetAddress;" +
-    "txnsign id:$txnId publickey:$myKey;"
+  val txncreator = buildString {
+    appendLine("txncreate id:$txnId;")
+    appendLine("txninput id:$txnId address:${sourceScriptAddress} amount:${total.toPlainString()} tokenid:$tokenId floating:true;")
+    states.mapNotNull { (index, value) -> value.takeUnless{ it.isEmpty() }?.let{ appendLine("txnstate id:$txnId port:$index value:$value;") } }
+    amountToAddress.forEach { (amount, address) -> appendLine("txnoutput id:$txnId amount:${amount.toPlainString()} tokenid:$tokenId address:$address;") }
+    append("txnsign id:$txnId publickey:$myKey;")
+  }
   
   MDS.cmd(txncreator)!!.jsonArray
   return txnId
 }
+
+private fun <T> Array<T>.sumOf(function: (T) -> BigDecimal) = fold(ZERO) { acc, it -> acc + function(it) }
 
 suspend fun Channel.update(isAck: Boolean, updateTx: String, settleTx: String): Channel {
   console.log("Updating channel")
@@ -68,7 +60,7 @@ suspend fun Channel.update(isAck: Boolean, updateTx: String, settleTx: String): 
   if (!isAck) {
     val signedUpdateTx = signAndExportTx(updateTxnId, my.keys.update)
     val signedSettleTx = signAndExportTx(settleTxnId, my.keys.settle)
-    publish(their.keys, listOf("TXN_UPDATE_ACK", signedUpdateTx, signedSettleTx).joinToString(";"))
+    publish(channelKey(their.keys, tokenId), listOf("TXN_UPDATE_ACK", signedUpdateTx, signedSettleTx).joinToString(";"))
   }
   val outputs = importedSettleTx["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Coin>(it) }
   val channelBalance = outputs.find { it.miniAddress == my.address }!!.tokenAmount to outputs.find { it.miniAddress == their.address }!!.tokenAmount
@@ -95,10 +87,10 @@ suspend fun Channel.send(amount: BigDecimal) {
   val settletxncreator = "txncreate id:$settleTxnId;" +
     "txninput id:$settleTxnId address:${input.address} amount:${input.amount} tokenid:${input.tokenId} floating:true;" +
     "txnstate id:$settleTxnId port:99 value:${state.toInt() + 1};" +
-    (if(my.balance - amount > BigDecimal.ZERO)
+    (if(my.balance - amount > ZERO)
       "txnoutput id:$settleTxnId amount:${(my.balance - amount).toPlainString()} tokenid:${input.tokenId} address:${my.address};"
     else "") +
-    (if(their.balance + amount > BigDecimal.ZERO)
+    (if(their.balance + amount > ZERO)
       "txnoutput id:$settleTxnId amount:${(their.balance + amount).toPlainString()} tokenid:${input.tokenId} address:${their.address};"
     else "") +
     "txnsign id:$settleTxnId publickey:${my.keys.settle};" +
@@ -106,8 +98,8 @@ suspend fun Channel.send(amount: BigDecimal) {
   val settleTxn = MDS.cmd(settletxncreator)!!.jsonArray.last()
   
   publish(
-    their.keys,
-    listOf(if(amount > BigDecimal.ZERO) "TXN_UPDATE" else "TXN_REQUEST", updateTxn.jsonObject["response"]!!.jsonObject["data"], settleTxn.jsonObject["response"]!!.jsonString("data")).joinToString(";")
+    channelKey(their.keys, tokenId),
+    listOf(if(amount > ZERO) "TXN_UPDATE" else "TXN_REQUEST", updateTxn.jsonObject["response"]!!.jsonString("data"), settleTxn.jsonObject["response"]!!.jsonString("data")).joinToString(";")
   )
 }
 

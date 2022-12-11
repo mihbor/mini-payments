@@ -95,7 +95,8 @@ suspend fun setChannelOpen(multisigAddress: String) {
 
 suspend fun insertChannel(
   tokenId: String,
-  amount: BigDecimal,
+  myBalance: BigDecimal,
+  theirBalance: BigDecimal,
   myKeys: Channel.Keys,
   theirKeys: Channel.Keys,
   signedTriggerTx: String,
@@ -114,7 +115,7 @@ suspend fun insertChannel(
       trigger_tx, update_tx, settle_tx, time_lock,
       multisig_address, eltoo_address, my_address, other_address
     ) VALUES (
-      'OFFERED', 0, '$tokenId', 0, ${amount.toPlainString()},
+      'OFFERED', 0, '$tokenId', ${myBalance.toPlainString()}, ${theirBalance.toPlainString()},
       '${myKeys.trigger}', '${myKeys.update}', '${myKeys.settle}',
       '${theirKeys.trigger}', '${theirKeys.update}', '${theirKeys.settle}',
       '$signedTriggerTx', '', '$signedSettlementTx', $timeLock,

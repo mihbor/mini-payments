@@ -48,8 +48,6 @@ fun getParams(parameterName: String): String? {
 }
 
 suspend fun init(uid: String?) {
-//  Minima.debug = true
-//  MDS.logging = true
   MDS.init(uid ?: "0x00", window.location.hostname, 9004) { msg: JsonElement ->
     when(msg.jsonString("event")) {
       "inited" -> {
@@ -59,7 +57,7 @@ suspend fun init(uid: String?) {
           balances.putAll(MDS.getBalances().associateBy { it.tokenId })
           createDB()
           getChannels(status = "OPEN").forEach {
-            subscribe(it.my.keys, from = it.updatedAt).onEach { msg ->
+            subscribe(channelKey(it.my.keys, it.tokenId), from = it.updatedAt).onEach { msg ->
               console.log("tx msg", msg)
               val splits = msg.split(";")
               if (splits[0].startsWith("TXN_UPDATE")) {

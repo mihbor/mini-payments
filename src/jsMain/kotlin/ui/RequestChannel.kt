@@ -2,20 +2,31 @@ package ui
 
 import Channel
 import androidx.compose.runtime.*
+import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.browser.document
 import logic.*
 import logic.JoinChannelEvent.*
+import ltd.mbor.minimak.MDS
+import ltd.mbor.minimak.getAddress
+import org.jetbrains.compose.web.attributes.disabled
+import org.jetbrains.compose.web.css.DisplayStyle
+import org.jetbrains.compose.web.css.display
 import org.jetbrains.compose.web.css.px
 import org.jetbrains.compose.web.css.width
 import org.jetbrains.compose.web.dom.Br
+import org.jetbrains.compose.web.dom.Button
 import org.jetbrains.compose.web.dom.Progress
 import org.jetbrains.compose.web.dom.Text
 import org.w3c.dom.HTMLCanvasElement
 
 @Composable
 fun RequestChannel() {
+  var myAddress by remember { mutableStateOf("") }
+  var amount by remember { mutableStateOf(BigDecimal.ZERO) }
+  var tokenId by remember { mutableStateOf("0x00") }
   var myKeys by remember { mutableStateOf(Channel.Keys("", "", "")) }
   
+  var showQR by remember { mutableStateOf(false) }
   var triggerTxStatus by remember { mutableStateOf("") }
   var updateTxStatus by remember { mutableStateOf("") }
   var settlementTxStatus by remember { mutableStateOf("") }
@@ -24,19 +35,22 @@ fun RequestChannel() {
   
   var channel by remember { mutableStateOf<Channel?>(null) }
   
-  LaunchedEffect ("requestChannel")  {
+  LaunchedEffect("requestChannel") {
     newKeys(3).apply {
       myKeys = Channel.Keys(this[0], this[1], this[2])
     }
+    myAddress = MDS.getAddress()
+  }
+  fun requestChannel() {
     triggerTxStatus = ""
     settlementTxStatus = ""
     val canvas = document.getElementById("joinChannelQR") as HTMLCanvasElement
     QRCode.toCanvas(
-      canvas, channelKey(myKeys)
+      canvas, channelKey(myKeys, tokenId) + ";" + amount.toPlainString() + ";" + myAddress
     ) { error ->
       if (error != null) console.error(error)
       else {
-        joinChannel(myKeys) { event, newChannel ->
+        joinChannel(myKeys, tokenId, amount) { event, newChannel ->
           progressStep++
           when (event) {
             SIGS_RECEIVED -> {
@@ -82,6 +96,22 @@ fun RequestChannel() {
     Br()
     Text("Settlement key: ${myKeys.settle}")
     Br()
+    DecimalNumberInput(amount, min = BigDecimal.ZERO, disabled = showQR) {
+      it?.let { amount = it }
+    }
+    TokenSelect(tokenId, disabled = showQR) {
+      tokenId = it
+    }
+    Br()
+    if (!showQR) Button({
+      if (amount < 0) disabled()
+      onClick {
+        showQR = !showQR
+        requestChannel()
+      }
+    }) {
+      Text("Request channel")
+    }
   }
   triggerTxStatus.takeUnless { it.isEmpty() }?.let {
     Text(it)
@@ -101,10 +131,13 @@ fun RequestChannel() {
     }
   }
   Br()
-  if (triggerTxStatus.isEmpty()) {
-    Canvas({
-      id("joinChannelQR")
-    })
+  Canvas({
+    id("joinChannelQR")
+    style {
+      if (!showQR) display(DisplayStyle.None)
+    }
+  })
+  if (showQR) {
     Br()
     Text("Scan QR code on counter party device")
   }

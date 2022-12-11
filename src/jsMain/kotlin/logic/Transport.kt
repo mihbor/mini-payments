@@ -1,7 +1,7 @@
 package logic
 
-import Channel
 import dev.gitlive.firebase.Firebase
+import dev.gitlive.firebase.FirebaseApp
 import dev.gitlive.firebase.FirebaseOptions
 import dev.gitlive.firebase.firestore.firestore
 import dev.gitlive.firebase.initialize
@@ -10,7 +10,7 @@ import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.mapNotNull
 import kotlin.js.Date
 
-val firebaseApp = Firebase.initialize(
+val firebaseApp: FirebaseApp = Firebase.initialize(
   options = FirebaseOptions(
     apiKey= "AIzaSyAxCuQGZTOrHLS-qdaUN2LdEkwHSy3CDpw",
     authDomain= "mini-payments.firebaseapp.com",
@@ -28,9 +28,10 @@ suspend fun fetch(id: String): String? = (
     .takeIf { it.exists }?.get("tx")
   )
 
-fun subscribe(keys: Channel.Keys, from: Long? = null): Flow<String> {
-  console.log("subscribing to", channelKey(keys))
-  return Firebase.firestore.collection(COLLECTION).document(channelKey(keys)).snapshots.mapNotNull { doc ->
+fun subscribe(id: String, from: Long? = null): Flow<String> {
+  firebaseApp
+  console.log("subscribing to", id)
+  return Firebase.firestore.collection(COLLECTION).document(id).snapshots.mapNotNull { doc ->
     if(doc.exists) doc else null
   }.filter{
     from == null || from <= (it.get("timestamp") as? Double ?: 0.0)
@@ -39,6 +40,8 @@ fun subscribe(keys: Channel.Keys, from: Long? = null): Flow<String> {
   }
 }
 
-suspend fun publish(keys: Channel.Keys, content: String) {
-  Firebase.firestore.collection(COLLECTION).document(channelKey(keys)).set(mapOf("tx" to content, "timestamp" to Date.now()))
+suspend fun publish(id: String, content: String) {
+  firebaseApp
+  console.log("publishing to", id)
+  Firebase.firestore.collection(COLLECTION).document(id).set(mapOf("tx" to content, "timestamp" to Date.now()))
 }

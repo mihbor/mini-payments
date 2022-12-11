@@ -18,8 +18,8 @@ fun main() {
     init(getParams("uid"))
   }
   renderComposableInBody {
-    var view by remember { mutableStateOf("Settings") }
     Style(StyleSheets)
+    var view by remember { mutableStateOf("Settings") }
     Menu(view) { view = it }
     when(view) {
       "Receive" -> Receive()

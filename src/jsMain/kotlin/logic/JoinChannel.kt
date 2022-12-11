@@ -2,11 +2,13 @@ package logic
 
 import Channel
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
+import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
 import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import logic.JoinChannelEvent.*
 import ltd.mbor.minimak.*
 import scope
@@ -19,10 +21,12 @@ enum class JoinChannelEvent{
 
 fun joinChannel(
   myKeys: Channel.Keys,
+  tokenId: String,
+  amount: BigDecimal,
   event: (JoinChannelEvent, Channel?) -> Unit = { _, _ -> }
 ) {
   var channel: Channel? = null
-  subscribe(myKeys).onEach { msg ->
+  subscribe(channelKey(myKeys, tokenId)).onEach { msg ->
     console.log("tx msg", msg)
     
     val splits = msg.split(";")
@@ -35,8 +39,9 @@ fun joinChannel(
       val theirKeys = Channel.Keys(splits[1], splits[2], splits[3])
       val triggerTx = splits[4]
       val settlementTx = splits[5]
+      val fundingTx = splits[6]
       event(SIGS_RECEIVED, null)
-      joinChannel(myKeys, theirKeys, triggerTx, settlementTx, timeLock, event)
+      joinChannel(myKeys, theirKeys, tokenId, amount, triggerTx, settlementTx, fundingTx, timeLock, event)
     }
   }.onCompletion {
     console.log("completed")
@@ -46,8 +51,11 @@ fun joinChannel(
 suspend fun joinChannel(
   myKeys: Channel.Keys,
   theirKeys: Channel.Keys,
+  tokenId: String,
+  myAmount: BigDecimal,
   triggerTx: String,
   settlementTx: String,
+  fundingTx: String,
   timeLock: Int,
   event: (JoinChannelEvent, Channel?) -> Unit = { _, _ -> }
 ): Channel {
@@ -57,8 +65,7 @@ suspend fun joinChannel(
   event(SCRIPTS_DEPLOYED, null)
   
   val triggerTxId = newTxId()
-  val outputs = MDS.importTx(triggerTxId, triggerTx)["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Coin>(it) }
-  val (amount, tokenId) = outputs.find { it.address == eltooScriptAddress }!!.let { it.tokenAmount to it.tokenId }
+  MDS.importTx(triggerTxId, triggerTx)
   val signedTriggerTx = signAndExportTx(triggerTxId, myKeys.trigger)
   event(TRIGGER_TX_SIGNED, null)
   
@@ -68,20 +75,38 @@ suspend fun joinChannel(
   val theirAddress = output.miniAddress
   val signedSettlementTx = signAndExportTx(settlementTxId, myKeys.settle)
   event(SETTLEMENT_TX_SIGNED, null)
-
-  val channelId = insertChannel(tokenId, amount, myKeys, theirKeys, signedTriggerTx, signedSettlementTx, timeLock, multisigScriptAddress, eltooScriptAddress, myAddress, theirAddress)
+  
+  val fundingTxId = newTxId()
+  val importedFundingTx = MDS.importTx(fundingTxId, fundingTx)
+  val theirAmount = json.decodeFromJsonElement<List<Coin>>(importedFundingTx.jsonObject["inputs"]!!).filter { it.tokenId == tokenId }.sumOf { it.tokenAmount } -
+    json.decodeFromJsonElement<List<Coin>>(importedFundingTx.jsonObject["outputs"]!!).filter { it.tokenId == tokenId }.sumOf { it.tokenAmount }
+  
+  val (signedFundingTx, exportedCoins) = if (myAmount > ZERO) {
+    val (inputs, change) = MDS.inputsWithChange(tokenId, myAmount)
+  
+    val txncreator = buildString {
+      inputs.forEach { appendLine("txninput id:$fundingTxId coinid:${it.coinId};") }
+      change.forEach { appendLine("txnoutput id:$fundingTxId amount:${it.amount.toPlainString()} tokenid:${it.tokenId} address:${it.address};") }
+      append("txnoutput id:$fundingTxId amount:${(myAmount + theirAmount).toPlainString()} tokenid:$tokenId address:$multisigScriptAddress;")
+    }
+    MDS.cmd(txncreator)
+    val scripts = MDS.getScripts()
+    signAndExportTx(fundingTxId, "auto") to inputs.map { MDS.exportCoin(it.coinId) to scripts[it.address] }
+  } else Pair(fundingTx, emptyList())
+  
+  val channelId = insertChannel(tokenId, myAmount, theirAmount, myKeys, theirKeys, signedTriggerTx, signedSettlementTx, timeLock, multisigScriptAddress, eltooScriptAddress, myAddress, theirAddress)
   val channel = Channel(
     id = channelId,
     sequenceNumber = 0,
     status = "OFFERED",
     tokenId = tokenId,
     my = Channel.Side(
-      balance = BigDecimal.ZERO,
+      balance = myAmount,
       address = myAddress,
       keys = myKeys
     ),
     their = Channel.Side(
-      balance = amount,
+      balance = theirAmount,
       address = theirAddress,
       keys = theirKeys
     ),
@@ -94,8 +119,8 @@ suspend fun joinChannel(
   event(CHANNEL_PERSISTED, channel)
 
   publish(
-    theirKeys,
-    listOf(myAddress, signedTriggerTx, signedSettlementTx).joinToString(";")
+    channelKey(theirKeys, tokenId),
+    (listOf(signedTriggerTx, signedSettlementTx, signedFundingTx) + exportedCoins.map{it.first} + exportedCoins.map{it.second}).joinToString(";")
   )
   event(CHANNEL_PUBLISHED, channel)
 

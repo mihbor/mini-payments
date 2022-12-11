@@ -25,7 +25,7 @@ fun Menu(view: String, setView: (String) -> Unit) {
       showMenu = false
     }
   }
-  H2({
+  H1({
     style {
       margin(0.px)
     }

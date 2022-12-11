@@ -3,6 +3,7 @@ package ui
 import Channel
 import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
+import com.ionspin.kotlin.bignum.decimal.toBigDecimal
 import externals.QrScanner
 import kotlinx.browser.document
 import kotlinx.coroutines.launch
@@ -19,7 +20,9 @@ import scope
 
 @Composable
 fun FundChannel() {
-  var amount by remember { mutableStateOf(ZERO) }
+  var myAmount by remember { mutableStateOf(ZERO) }
+  var theirAmount by remember { mutableStateOf(ZERO) }
+  var theirAddress by remember { mutableStateOf("") }
   var tokenId by remember { mutableStateOf("0x00") }
   
   var myKeys by remember { mutableStateOf(Channel.Keys("", "", "")) }
@@ -93,6 +96,24 @@ fun FundChannel() {
       }
     }
     Br()
+    Text("Counterparty address:")
+    TextInput(theirAddress) {
+      onInput {
+        theirAddress = it.value
+      }
+      style {
+        width(300.px)
+      }
+    }
+    Br()
+    Text("Counterparty contribution to channel:")
+    DecimalNumberInput(theirAmount, min = ZERO) {
+      it?.let { theirAmount = it }
+    }
+    TokenSelect(tokenId) {
+      tokenId = it
+    }
+    Br()
   }
   fundingTxStatus.takeUnless { it.isEmpty() }?.let {
     Text(it)
@@ -115,13 +136,13 @@ fun FundChannel() {
       channel = it
     }
   }
-  if (listOf(myKeys.trigger, myKeys.update, myKeys.settle, theirKeys.trigger, theirKeys.update, theirKeys.settle).all(String::isNotEmpty)
+  if (listOf(myKeys.trigger, myKeys.update, myKeys.settle, theirKeys.trigger, theirKeys.update, theirKeys.settle, theirAddress).all(String::isNotEmpty)
     && fundingTxStatus.isEmpty()
   ) {
-    DecimalNumberInput(amount, min = ZERO) {
-      it?.let { amount = it }
+    DecimalNumberInput(myAmount, min = ZERO) {
+      it?.let { myAmount = it }
     }
-    TokenSelect(tokenId) {
+    TokenSelect(tokenId, disabled = true) {
       tokenId = it
     }
     Text("Update only time lock (block diff)")
@@ -131,12 +152,12 @@ fun FundChannel() {
       }
     }
     Button({
-      if (amount <= 0) disabled()
+      if (myAmount <= 0) disabled()
       onClick {
         showFundScanner = false
         qrScanner?.stop()
         scope.launch {
-          fundChannel(myKeys, theirKeys, amount, tokenId, timeLock) { event, newChannel ->
+          fundChannel(myKeys, theirKeys, theirAddress, myAmount, theirAmount, tokenId, timeLock) { event, newChannel ->
             progressStep++
             when(event) {
               FUNDING_TX_CREATED -> fundingTxStatus = "Funding transaction created"
@@ -197,6 +218,9 @@ fun FundChannel() {
         console.log("decoded qr code: $result")
         result.split(';').apply {
           theirKeys = Channel.Keys(this[0], this[1], this[2])
+          tokenId = this[3]
+          theirAmount = this[4].toBigDecimal()
+          theirAddress = this[5]
         }
         qrScanner!!.stop()
         showFundScanner = false

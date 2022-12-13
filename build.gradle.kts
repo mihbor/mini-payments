@@ -1,4 +1,3 @@
-val ktorVersion = "2.1.2"
 val bignumVersion = "0.3.7"
 
 plugins {
@@ -33,8 +32,6 @@ kotlin {
       dependencies {
         implementation(compose.web.core)
         implementation(compose.runtime)
-        implementation("io.ktor:ktor-client-core:$ktorVersion")
-        implementation("io.ktor:ktor-client-js:$ktorVersion")
 
         implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.4.1")
 
@@ -45,8 +42,8 @@ kotlin {
 
         implementation("ltd.mbor:minimak:0.1-SNAPSHOT")
 
-        implementation(npm("qrcode", "1.5.0"))
-        implementation(npm("qr-scanner", "1.3.0"))
+        implementation(npm("qrcode", "1.5.1"))
+        implementation(npm("qr-scanner", "1.4.2"))
       }
     }
   }
@@ -57,6 +54,7 @@ tasks.register<Zip>("minidappDistribution") {
   archiveFileName.set("${project.name}.mds.zip")
   destinationDirectory.set(layout.buildDirectory.dir("minidapp"))
   from(layout.buildDirectory.dir("distributions"))
+  exclude("*.LICENSE.txt")
 }
 
 configurations.all {

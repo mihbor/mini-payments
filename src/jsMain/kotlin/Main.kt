@@ -4,6 +4,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
+import logic.channels
 import logic.getParams
 import logic.init
 import org.jetbrains.compose.web.css.Style
@@ -26,7 +27,7 @@ fun main() {
       "Send" -> Send()
       "Fund channel" -> FundChannel()
       "Request channel" -> RequestChannel()
-      "Channels" -> ChannelListing()
+      "Channels" -> ChannelListing(channels)
       "Settings" -> Settings()
     }
   }

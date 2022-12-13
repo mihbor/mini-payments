@@ -18,7 +18,7 @@ fun ChannelView(
   updateChannel: (Channel) -> Unit
 ) {
   Br()
-  multisigScriptBalances.forEach {
+  multisigScriptBalances.firstOrNull{ it.tokenId == channel.tokenId }?.let{
     TokenIcon(it.tokenId, balances)
     Text("${it.tokenName} token funding balance: ${it.confirmed.toPlainString()}")
     Br()

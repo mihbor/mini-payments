@@ -66,7 +66,9 @@ suspend fun Channel.update(isAck: Boolean, updateTx: String, settleTx: String): 
   val channelBalance = outputs.find { it.miniAddress == my.address }!!.tokenAmount to outputs.find { it.miniAddress == their.address }!!.tokenAmount
   val sequenceNumber = importedSettleTx["state"]!!.jsonArray.map { json.decodeFromJsonElement<State>(it) }.find { it.port == 99 }?.data?.toInt()
   
-  return updateChannel(this, channelBalance, sequenceNumber!!, updateTx, settleTx)
+  return updateChannel(this, channelBalance, sequenceNumber!!, updateTx, settleTx).also {
+    channels[channels.indexOf(this)] = it
+  }
 }
 
 suspend fun Channel.request(amount: BigDecimal) = this.send(-amount)

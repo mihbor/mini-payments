@@ -1,5 +1,6 @@
 package logic
 
+import Channel
 import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import kotlinx.browser.window
@@ -28,6 +29,7 @@ ENDIF
 """
 
 val balances = mutableStateMapOf<String, Balance>()
+val channels = mutableStateListOf<Channel>()
 var blockNumber by mutableStateOf(0)
 
 fun newTxId() = Random.nextInt(1_000_000_000)
@@ -40,7 +42,7 @@ val eltooScriptCoins = mutableStateMapOf<String, List<Coin>>()
 external fun decodeURIComponent(encodedURI: String): String
 
 fun getParams(parameterName: String): String? {
-  val items = window.location.search.substring(1).split("&");
+  val items = window.location.search.takeIf { it.length > 1 }?.substring(1)?.split("&") ?: emptyList()
   return items.asSequence().mapNotNull {
     val (name, value) = it.split("=");
     if (name == parameterName) decodeURIComponent(value) else null
@@ -56,12 +58,13 @@ suspend fun init(uid: String?) {
           blockNumber = MDS.getBlockNumber()
           balances.putAll(MDS.getBalances().associateBy { it.tokenId })
           createDB()
-          getChannels(status = "OPEN").forEach {
-            subscribe(channelKey(it.my.keys, it.tokenId), from = it.updatedAt).onEach { msg ->
+          channels.addAll(getChannels(status = "OPEN"))
+          channels.forEach { channel ->
+            subscribe(channelKey(channel.my.keys, channel.tokenId), from = channel.updatedAt).onEach { msg ->
               console.log("tx msg", msg)
               val splits = msg.split(";")
               if (splits[0].startsWith("TXN_UPDATE")) {
-                it.update(splits[0].endsWith("_ACK"), updateTx = splits[1], settleTx = splits[2])
+                channels.first { it.id == channel.id }.update(splits[0].endsWith("_ACK"), updateTx = splits[1], settleTx = splits[2])
               }
             }.onCompletion {
               console.log("completed")

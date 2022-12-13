@@ -3,8 +3,6 @@ package ui
 import Channel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
 import kotlinx.coroutines.launch
 import logic.balances
 import logic.blockNumber
@@ -16,8 +14,7 @@ import org.jetbrains.compose.web.dom.*
 import scope
 
 @Composable
-fun ChannelListing() {
-  val channels = remember { mutableStateListOf<Channel>() }
+fun ChannelListing(channels: MutableList<Channel>) {
 
   LaunchedEffect("channels") { loadChannels(channels) }
   Button({

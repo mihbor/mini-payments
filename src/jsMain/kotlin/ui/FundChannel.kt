@@ -8,9 +8,7 @@ import externals.QrScanner
 import kotlinx.browser.document
 import kotlinx.coroutines.launch
 import logic.FundChannelEvent.*
-import logic.eltooScriptCoins
 import logic.fundChannel
-import logic.multisigScriptBalances
 import logic.newKeys
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
@@ -132,7 +130,7 @@ fun FundChannel() {
     Br()
   }
   channel?.let {
-    ChannelView(it, multisigScriptBalances, eltooScriptCoins[it.eltooAddress] ?: emptyList()) {
+    ChannelView(it) {
       channel = it
     }
   }

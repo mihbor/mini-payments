@@ -5,16 +5,14 @@ import androidx.compose.runtime.Composable
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import logic.balances
 import logic.blockNumber
-import ltd.mbor.minimak.Balance
-import ltd.mbor.minimak.Coin
+import logic.eltooScriptCoins
+import logic.multisigScriptBalances
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Text
 
 @Composable
 fun ChannelView(
   channel: Channel,
-  multisigScriptBalances: List<Balance>,
-  eltooScriptCoins: List<Coin>,
   updateChannel: (Channel) -> Unit
 ) {
   Br()
@@ -31,7 +29,7 @@ fun ChannelView(
   Settlement(
     channel.copy(status = if (multisigScriptBalances.any { it.unconfirmed > ZERO || it.confirmed > ZERO }) "OPEN" else channel.status),
     blockNumber,
-    eltooScriptCoins,
+    eltooScriptCoins[channel.eltooAddress] ?: emptyList(),
     updateChannel
   )
 }

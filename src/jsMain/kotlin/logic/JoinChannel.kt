@@ -27,7 +27,7 @@ fun joinChannel(
 ) {
   var channel: Channel? = null
   subscribe(channelKey(myKeys, tokenId)).onEach { msg ->
-    console.log("tx msg", msg)
+    log("tx msg: $msg")
     
     val splits = msg.split(";")
     if (splits[0].startsWith("TXN_UPDATE")) {
@@ -44,7 +44,7 @@ fun joinChannel(
       joinChannel(myKeys, theirKeys, tokenId, amount, triggerTx, settlementTx, fundingTx, timeLock, event)
     }
   }.onCompletion {
-    console.log("completed")
+    log("completed")
   }.launchIn(scope)
 }
 

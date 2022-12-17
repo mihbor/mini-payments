@@ -3,7 +3,7 @@ val bignumVersion = "0.3.7"
 plugins {
   kotlin("multiplatform") version "1.7.20"
   kotlin("plugin.serialization") version "1.7.20"
-  id("org.jetbrains.compose") version "1.2.1"
+  id("org.jetbrains.compose") version "1.2.2"
 }
 
 repositories {

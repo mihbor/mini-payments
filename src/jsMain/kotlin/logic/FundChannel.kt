@@ -30,7 +30,7 @@ suspend fun fundChannel(
   var channel = prepareFundChannel(myKeys, theirKeys, theirAddress, myAmount, theirAmount, tokenId, timeLock, event)
   
   subscribe(channelKey(myKeys, tokenId)).onEach { msg ->
-    console.log("tx msg", msg)
+    log("tx msg: $msg")
     val splits = msg.split(";")
     if (splits[0].startsWith("TXN_UPDATE")) {
       val isAck = splits[0].endsWith("_ACK")
@@ -44,7 +44,7 @@ suspend fun fundChannel(
       event(CHANNEL_FUNDED, channel)
     }
   }.onCompletion {
-    console.log("completed")
+    log("completed")
   }.launchIn(scope)
 }
 
@@ -140,12 +140,13 @@ suspend fun Channel.commitFund(
     .find { it.address == multisigScriptAddress && it.tokenId == tokenId }!!.tokenAmount - myAmount
   theirInputCoins.forEach { MDS.importCoin(it) }
   theirInputScripts.forEach { MDS.deployScript(it) }
-  val txncreator = "txnsign id:$fundingTxId publickey:$key;" +
-    "txnpost id:$fundingTxId auto:true;" +
-    "txndelete id:$fundingTxId;"
+  val txncreator = """
+    txnsign id:$fundingTxId publickey:$key;
+    txnpost id:$fundingTxId auto:true;
+    txndelete id:$fundingTxId;""".trimIndent()
   val result = MDS.cmd(txncreator)!!.jsonArray
   val status = result.find{ it.jsonString("command") == "txnpost" }!!.jsonString("status")
-  console.log("txnpost status", status)
+  log("txnpost status: $status")
   
   if (status.toBoolean()) {
     MDS.sql("""UPDATE channel SET

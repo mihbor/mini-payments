@@ -4,8 +4,10 @@ import Channel
 import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.browser.document
-import logic.*
 import logic.JoinChannelEvent.*
+import logic.channelKey
+import logic.joinChannel
+import logic.newKeys
 import ltd.mbor.minimak.MDS
 import ltd.mbor.minimak.getAddress
 import org.jetbrains.compose.web.attributes.disabled
@@ -104,13 +106,19 @@ fun RequestChannel() {
     }
     Br()
     if (!showQR) Button({
-      if (amount < 0) disabled()
+      if (amount < 0 || listOf(myKeys.trigger, myKeys.update, myKeys.settle).any{ it.isBlank() }) disabled()
       onClick {
         showQR = !showQR
         requestChannel()
       }
     }) {
       Text("Request channel")
+    } else Button({
+      onClick {
+        showQR = !showQR
+      }
+    }) {
+      Text("Cancel")
     }
   }
   triggerTxStatus.takeUnless { it.isEmpty() }?.let {
@@ -126,7 +134,7 @@ fun RequestChannel() {
     Br()
   }
   channel?.let {
-    ChannelView(it, multisigScriptBalances, eltooScriptCoins[it.eltooAddress] ?: emptyList()) {
+    ChannelView(it) {
       channel = it
     }
   }

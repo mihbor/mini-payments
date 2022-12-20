@@ -2,6 +2,7 @@ package ui
 
 import Channel
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import com.ionspin.kotlin.bignum.decimal.toBigDecimal
 import externals.QrScanner
@@ -10,6 +11,8 @@ import kotlinx.coroutines.launch
 import logic.FundChannelEvent.*
 import logic.fundChannel
 import logic.newKeys
+import ltd.mbor.minimak.Balance
+import ltd.mbor.minimak.Token
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.*
 import org.jetbrains.compose.web.dom.*
@@ -17,7 +20,7 @@ import org.w3c.dom.HTMLVideoElement
 import scope
 
 @Composable
-fun FundChannel() {
+fun FundChannel(balances: SnapshotStateMap<String, Balance>, tokens: SnapshotStateMap<String, Token>) {
   var myAmount by remember { mutableStateOf(ZERO) }
   var theirAmount by remember { mutableStateOf(ZERO) }
   var theirAddress by remember { mutableStateOf("") }
@@ -108,7 +111,7 @@ fun FundChannel() {
     DecimalNumberInput(theirAmount, min = ZERO) {
       it?.let { theirAmount = it }
     }
-    TokenSelect(tokenId) {
+    TokenSelect(tokenId, balances, tokens) {
       tokenId = it
     }
     Br()
@@ -140,7 +143,7 @@ fun FundChannel() {
     DecimalNumberInput(myAmount, min = ZERO) {
       it?.let { myAmount = it }
     }
-    TokenSelect(tokenId, disabled = true) {
+    TokenSelect(tokenId, balances, disabled = true) {
       tokenId = it
     }
     Text("Update only time lock (block diff)")

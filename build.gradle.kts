@@ -40,7 +40,7 @@ kotlin {
 
         implementation("dev.gitlive:firebase-firestore-js:1.6.2")
 
-        implementation("ltd.mbor:minimak:0.1-SNAPSHOT")
+        implementation("ltd.mbor:minimak:0.2-SNAPSHOT")
 
         implementation(npm("qrcode", "1.5.1"))
         implementation(npm("qr-scanner", "1.4.2"))

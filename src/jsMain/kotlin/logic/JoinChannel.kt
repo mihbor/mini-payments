@@ -6,20 +6,17 @@ import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
-import kotlinx.serialization.json.decodeFromJsonElement
-import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import logic.JoinChannelEvent.*
 import ltd.mbor.minimak.*
 import scope
 import kotlin.js.Date
-
 
 enum class JoinChannelEvent{
   SCRIPTS_DEPLOYED, SIGS_RECEIVED, TRIGGER_TX_SIGNED, SETTLEMENT_TX_SIGNED, CHANNEL_PERSISTED, CHANNEL_PUBLISHED, CHANNEL_UPDATED, CHANNEL_UPDATED_ACKED
 }
 
 fun joinChannel(
+  myAddress: String,
   myKeys: Channel.Keys,
   tokenId: String,
   amount: BigDecimal,
@@ -41,7 +38,7 @@ fun joinChannel(
       val settlementTx = splits[5]
       val fundingTx = splits[6]
       event(SIGS_RECEIVED, null)
-      joinChannel(myKeys, theirKeys, tokenId, amount, triggerTx, settlementTx, fundingTx, timeLock, event)
+      joinChannel(myAddress, myKeys, theirKeys, tokenId, amount, triggerTx, settlementTx, fundingTx, timeLock, event)
     }
   }.onCompletion {
     log("completed")
@@ -49,6 +46,7 @@ fun joinChannel(
 }
 
 suspend fun joinChannel(
+  myAddress: String,
   myKeys: Channel.Keys,
   theirKeys: Channel.Keys,
   tokenId: String,
@@ -59,7 +57,6 @@ suspend fun joinChannel(
   timeLock: Int,
   event: (JoinChannelEvent, Channel?) -> Unit = { _, _ -> }
 ): Channel {
-  val myAddress = MDS.getAddress()
   multisigScriptAddress = MDS.deployScript(triggerScript(theirKeys.trigger, myKeys.trigger))
   eltooScriptAddress = MDS.deployScript(eltooScript(timeLock, theirKeys.update, myKeys.update, theirKeys.settle, myKeys.settle))
   event(SCRIPTS_DEPLOYED, null)
@@ -71,16 +68,16 @@ suspend fun joinChannel(
   
   val settlementTxId = newTxId()
   val importedSettlementTx = MDS.importTx(settlementTxId, settlementTx)
-  val output = json.decodeFromJsonElement<Coin>(importedSettlementTx["outputs"]!!.jsonArray.first())
-  val theirAddress = output.miniAddress
+  val theirAddress = importedSettlementTx.outputs.first().miniAddress
   val signedSettlementTx = signAndExportTx(settlementTxId, myKeys.settle)
   event(SETTLEMENT_TX_SIGNED, null)
   
   val fundingTxId = newTxId()
   val importedFundingTx = MDS.importTx(fundingTxId, fundingTx)
-  val theirAmount = json.decodeFromJsonElement<List<Coin>>(importedFundingTx.jsonObject["inputs"]!!).filter { it.tokenId == tokenId }.sumOf { it.tokenAmount } -
-    json.decodeFromJsonElement<List<Coin>>(importedFundingTx.jsonObject["outputs"]!!).filter { it.tokenId == tokenId }.sumOf { it.tokenAmount }
-  
+  val theirAmount = importedFundingTx.inputs.filter { it.tokenId == tokenId }.sumOf { it.tokenAmount } -
+    importedFundingTx.outputs.filter { it.tokenId == tokenId }.sumOf { it.tokenAmount }
+  log("their amount: ${theirAmount.toPlainString()}")
+
   val (signedFundingTx, exportedCoins) = if (myAmount > ZERO) {
     val (inputs, change) = MDS.inputsWithChange(tokenId, myAmount)
   
@@ -92,7 +89,10 @@ suspend fun joinChannel(
     MDS.cmd(txncreator)
     val scripts = MDS.getScripts()
     signAndExportTx(fundingTxId, "auto") to inputs.map { MDS.exportCoin(it.coinId) to scripts[it.address] }
-  } else Pair(fundingTx, emptyList())
+  } else {
+    MDS.cmd("txnoutput id:$fundingTxId amount:${theirAmount.toPlainString()} tokenid:$tokenId address:$multisigScriptAddress;")
+    Pair(signAndExportTx(fundingTxId, "auto"), emptyList())
+  }
   
   val channelId = insertChannel(tokenId, myAmount, theirAmount, myKeys, theirKeys, signedTriggerTx, signedSettlementTx, timeLock, multisigScriptAddress, eltooScriptAddress, myAddress, theirAddress)
   val channel = Channel(

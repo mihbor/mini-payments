@@ -5,9 +5,7 @@ import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onCompletion
 import kotlinx.coroutines.flow.onEach
-import kotlinx.serialization.json.decodeFromJsonElement
 import kotlinx.serialization.json.jsonArray
-import kotlinx.serialization.json.jsonObject
 import logic.FundChannelEvent.*
 import ltd.mbor.minimak.*
 import scope
@@ -38,7 +36,7 @@ suspend fun fundChannel(
       event(if (isAck) CHANNEL_UPDATED_ACKED else CHANNEL_UPDATED, channel)
     } else {
       val (triggerTx, settlementTx, fundingTx) = splits
-      val (theirInputCoins, theirInputScripts) = splits.subList(3, splits.size).let{ it.chunked(it.size/2) }
+      val (theirInputCoins, theirInputScripts) = splits.subList(3, splits.size).let{ it.takeUnless { it.isEmpty() }?.chunked(it.size/2) ?: listOf(emptyList(), emptyList()) }
       event(SIGS_RECEIVED, channel)
       channel = channel.commitFund("auto", tokenId, myAmount, triggerTx, settlementTx, fundingTx, theirInputCoins, theirInputScripts)
       event(CHANNEL_FUNDED, channel)
@@ -136,7 +134,7 @@ suspend fun Channel.commitFund(
   MDS.importTx(newTxId(), triggerTx)
   MDS.importTx(newTxId(), settlementTx)
   val fundingTxId = newTxId()
-  val theirBalance = json.decodeFromJsonElement<List<Coin>>(MDS.importTx(fundingTxId, fundingTx).jsonObject["outputs"]!!.jsonArray)
+  val theirBalance = MDS.importTx(fundingTxId, fundingTx).outputs
     .find { it.address == multisigScriptAddress && it.tokenId == tokenId }!!.tokenAmount - myAmount
   theirInputCoins.forEach { MDS.importCoin(it) }
   theirInputScripts.forEach { MDS.deployScript(it) }

@@ -1,13 +1,14 @@
 package ui
 
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
 import externals.QrScanner
 import kotlinx.browser.document
 import kotlinx.browser.window
 import kotlinx.coroutines.launch
-import logic.balances
 import logic.isPaymentChannelAvailable
+import ltd.mbor.minimak.Balance
 import ltd.mbor.minimak.MDS
 import ltd.mbor.minimak.send
 import org.jetbrains.compose.web.attributes.disabled
@@ -17,7 +18,7 @@ import org.w3c.dom.HTMLVideoElement
 import scope
 
 @Composable
-fun Send() {
+fun Send(balances: SnapshotStateMap<String, Balance>) {
   
   var showCam by remember { mutableStateOf(false) }
   var sending by remember { mutableStateOf(false) }
@@ -38,8 +39,8 @@ fun Send() {
   DecimalNumberInput(amount, min = ZERO) {
     it?.let { amount = it }
   }
-  TokenIcon(tokenId, balances)
-  TokenSelect(tokenId) {
+  TokenIcon(tokenId, logic.balances)
+  TokenSelect(tokenId, balances) {
     tokenId = it
   }
   Button({

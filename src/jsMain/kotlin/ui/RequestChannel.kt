@@ -2,13 +2,16 @@ package ui
 
 import Channel
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.browser.document
 import logic.JoinChannelEvent.*
 import logic.channelKey
 import logic.joinChannel
 import logic.newKeys
+import ltd.mbor.minimak.Balance
 import ltd.mbor.minimak.MDS
+import ltd.mbor.minimak.Token
 import ltd.mbor.minimak.getAddress
 import org.jetbrains.compose.web.attributes.disabled
 import org.jetbrains.compose.web.css.DisplayStyle
@@ -22,7 +25,7 @@ import org.jetbrains.compose.web.dom.Text
 import org.w3c.dom.HTMLCanvasElement
 
 @Composable
-fun RequestChannel() {
+fun RequestChannel(balances: SnapshotStateMap<String, Balance>, tokens: SnapshotStateMap<String, Token>) {
   var myAddress by remember { mutableStateOf("") }
   var amount by remember { mutableStateOf(BigDecimal.ZERO) }
   var tokenId by remember { mutableStateOf("0x00") }
@@ -52,7 +55,7 @@ fun RequestChannel() {
     ) { error ->
       if (error != null) console.error(error)
       else {
-        joinChannel(myKeys, tokenId, amount) { event, newChannel ->
+        joinChannel(myAddress, myKeys, tokenId, amount) { event, newChannel ->
           progressStep++
           when (event) {
             SIGS_RECEIVED -> {
@@ -101,7 +104,7 @@ fun RequestChannel() {
     DecimalNumberInput(amount, min = BigDecimal.ZERO, disabled = showQR) {
       it?.let { amount = it }
     }
-    TokenSelect(tokenId, disabled = showQR) {
+    TokenSelect(tokenId, balances, tokens, disabled = showQR) {
       tokenId = it
     }
     Br()

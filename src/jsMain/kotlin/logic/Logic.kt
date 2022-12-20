@@ -17,6 +17,7 @@ import scope
 import kotlin.random.Random
 
 val balances = mutableStateMapOf<String, Balance>()
+val tokens = mutableStateMapOf<String, Token>()
 var blockNumber by mutableStateOf(0)
 
 fun newTxId() = Random.nextInt(1_000_000_000)
@@ -39,6 +40,7 @@ suspend fun init(uid: String?) {
         scope.launch {
           blockNumber = MDS.getBlockNumber()
           balances.putAll(MDS.getBalances().associateBy { it.tokenId })
+          tokens.putAll(MDS.getTokens().associateBy { it.tokenId })
           createDB()
           channels.addAll(getChannels(status = "OPEN"))
           channels.forEach { channel ->
@@ -58,6 +60,9 @@ suspend fun init(uid: String?) {
         val newBalances = MDS.getBalances().associateBy { it.tokenId }
         balances.clear()
         balances.putAll(newBalances)
+        val newTokens = MDS.getTokens().associateBy { it.tokenId }
+        tokens.clear()
+        tokens.putAll(newTokens)
       }
       "NEWBLOCK" -> {
         blockNumber = msg.jsonObject["data"]!!.jsonObject["txpow"]!!.jsonObject["header"]!!.jsonString("block")!!.toInt()

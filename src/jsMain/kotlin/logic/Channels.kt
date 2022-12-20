@@ -4,9 +4,10 @@ import Channel
 import androidx.compose.runtime.*
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import com.ionspin.kotlin.bignum.decimal.BigDecimal.Companion.ZERO
-import kotlinx.serialization.json.*
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
 import ltd.mbor.minimak.*
-import ltd.mbor.minimak.State
 
 val channels = mutableStateListOf<Channel>()
 var multisigScriptAddress by mutableStateOf("")
@@ -77,7 +78,7 @@ suspend fun signFloatingTx(
 private fun <T> Array<T>.sumOf(function: (T) -> BigDecimal) = fold(ZERO) { acc, it -> acc + function(it) }
 
 suspend fun Channel.update(isAck: Boolean, updateTx: String, settleTx: String): Channel {
-  log("Updating channel")
+  log("Updating channel isAck:$isAck")
   val updateTxnId = newTxId()
   MDS.importTx(updateTxnId, updateTx)
   val settleTxnId = newTxId()
@@ -88,11 +89,14 @@ suspend fun Channel.update(isAck: Boolean, updateTx: String, settleTx: String): 
     val signedSettleTx = signAndExportTx(settleTxnId, my.keys.settle)
     publish(channelKey(their.keys, tokenId), listOf("TXN_UPDATE_ACK", signedUpdateTx, signedSettleTx).joinToString(";"))
   }
-  val outputs = importedSettleTx["outputs"]!!.jsonArray.map { json.decodeFromJsonElement<Coin>(it) }
-  val channelBalance = outputs.find { it.miniAddress == my.address }!!.tokenAmount to outputs.find { it.miniAddress == their.address }!!.tokenAmount
-  val sequenceNumber = importedSettleTx["state"]!!.jsonArray.map { json.decodeFromJsonElement<State>(it) }.find { it.port == 99 }?.data?.toInt()
+  val outputs = importedSettleTx.outputs
+  val myBalance = outputs.find { it.miniAddress == my.address }?.tokenAmount
+  val theirBalance = outputs.find { it.miniAddress == their.address }?.tokenAmount
+  val sequenceNumber = importedSettleTx.state.find { it.port == 99 }?.data?.toInt()
   
-  return updateChannel(this, channelBalance, sequenceNumber!!, updateTx, settleTx).also {
+  return if (myBalance == null || theirBalance == null) this.also {
+    log("balance for my address ${my.address}: $myBalance, balance for their address ${their.address}: $theirBalance")
+  } else updateChannel(this, myBalance to theirBalance, sequenceNumber!!, updateTx, settleTx).also {
     channels[channels.indexOf(this)] = it
   }
 }
@@ -101,8 +105,8 @@ suspend fun Channel.request(amount: BigDecimal) = this.send(-amount)
 
 suspend fun Channel.send(amount: BigDecimal) {
   val currentSettlementTx = MDS.importTx(newTxId(), settlementTx)
-  val input = json.decodeFromJsonElement<Coin>(currentSettlementTx["inputs"]!!.jsonArray.first())
-  val state = currentSettlementTx["state"]!!.jsonArray.find{ it.jsonObject["port"]!!.jsonPrimitive.int == 99 }!!.jsonObject["data"]!!.jsonPrimitive.content
+  val input = currentSettlementTx.inputs.first()
+  val state = currentSettlementTx.state.find{ it.port == 99 }!!.data
   val updateTxnId = newTxId()
   val updatetxncreator = buildString {
     appendLine("txncreate id:$updateTxnId;")

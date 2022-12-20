@@ -4,10 +4,7 @@ import Channel
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import kotlinx.coroutines.launch
-import logic.balances
-import logic.blockNumber
-import logic.eltooScriptCoins
-import logic.getChannels
+import logic.*
 import ltd.mbor.minimak.MDS
 import ltd.mbor.minimak.getCoins
 import org.jetbrains.compose.web.dom.*
@@ -15,12 +12,13 @@ import scope
 
 @Composable
 fun ChannelListing(channels: MutableList<Channel>) {
-
-  LaunchedEffect("channels") { loadChannels(channels) }
+  LaunchedEffect("channels") {
+    channels.load()
+  }
   Button({
     onClick {
       scope.launch {
-        loadChannels(channels)
+        channels.load()
       }
     }
   }) {
@@ -65,11 +63,14 @@ fun ChannelListing(channels: MutableList<Channel>) {
   }
 }
 
-suspend fun loadChannels(channels: MutableList<Channel>) {
-  val newChannels = getChannels()
-  channels.clear()
-  channels.addAll(newChannels)
-  newChannels.filter{ it.eltooAddress.isNotBlank() }.forEach {
-    eltooScriptCoins.put(it.eltooAddress, MDS.getCoins(address = it.eltooAddress))
+suspend fun MutableList<Channel>.load() {
+  val newChannels = getChannels().map { channel ->
+    val eltooCoins = MDS.getCoins(address = channel.eltooAddress)
+    eltooScriptCoins.put(channel.eltooAddress, eltooCoins)
+    if (channel.status == "OPEN" && eltooCoins.isNotEmpty()) updateChannelStatus(channel, "TRIGGERED")
+    else if (channel.status in listOf("TRIGGERED", "UPDATED") && eltooCoins.isEmpty()) updateChannelStatus(channel, "SETTLED")
+    else channel
   }
+  clear()
+  addAll(newChannels)
 }

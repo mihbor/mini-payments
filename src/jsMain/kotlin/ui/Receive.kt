@@ -1,11 +1,13 @@
 package ui
 
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import com.ionspin.kotlin.bignum.decimal.BigDecimal
 import kotlinx.browser.document
 import kotlinx.browser.window
-import logic.balances
+import ltd.mbor.minimak.Balance
 import ltd.mbor.minimak.MDS
+import ltd.mbor.minimak.Token
 import ltd.mbor.minimak.getAddress
 import org.jetbrains.compose.web.dom.Br
 import org.jetbrains.compose.web.dom.Button
@@ -24,7 +26,7 @@ fun drawQR(address: String, tokenId: String, amount:String = "") {
 }
 
 @Composable
-fun Receive() {
+fun Receive(balances: SnapshotStateMap<String, Balance>, tokens: SnapshotStateMap<String, Token>) {
   var myAddress by remember { mutableStateOf("") }
   var tokenId by remember { mutableStateOf("0x00") }
   var amount by remember { mutableStateOf(BigDecimal.ZERO) }
@@ -42,8 +44,8 @@ fun Receive() {
       drawQR(myAddress, tokenId, amount.toPlainString())
     }
   }
-  TokenIcon(tokenId, balances)
-  TokenSelect(tokenId) {
+  TokenIcon(tokenId, logic.balances)
+  TokenSelect(tokenId, balances, tokens) {
     tokenId = it
     drawQR(myAddress, tokenId, amount.toPlainString())
   }

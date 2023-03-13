@@ -1,3 +1,5 @@
+This project has moved to https://github.com/mihbor/minipay and this repository is being archived.
+
 MinimaK dependency.
 
 This project has dependencies on the MinimaK library.
